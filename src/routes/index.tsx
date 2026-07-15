@@ -35,16 +35,12 @@ export const Route = createFileRoute("/")({
         content:
           "Importe, aprimore e exporte vídeos curtos do TikTok, YouTube Shorts e Instagram Reels com edições automáticas.",
       },
-      { property: "og:title", content: "Shorts Enhancer Studio — Edite e aprimore vídeos curtos" },
-      {
-        property: "og:description",
-        content:
-          "Importe, aprimore e exporte vídeos curtos do TikTok, YouTube Shorts e Instagram Reels com edições automáticas.",
-      },
     ],
   }),
   component: Index,
 });
+
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 
 type Platform = "TikTok" | "YouTube Shorts" | "Instagram" | "Desconhecida";
 
@@ -53,33 +49,48 @@ type VideoItem = {
   name: string;
   source: "link" | "upload";
   platform?: Platform;
-  url: string;
-  duration?: number;
-  editedUrl?: string;
+  originalUrl: string; // preview do original (blob p/ upload; url do link)
+  editedUrl?: string; // url do vídeo processado (backend)
+  downloadUrl?: string; // url para download
   status: "idle" | "processing" | "done" | "error";
+  errorMessage?: string;
 };
 
 function detectPlatform(url: string): Platform {
   const u = url.toLowerCase();
   if (u.includes("tiktok.com")) return "TikTok";
-  if (u.includes("youtube.com/shorts") || u.includes("youtu.be")) return "YouTube Shorts";
+  if (u.includes("youtube.com/shorts") || u.includes("youtu.be") || u.includes("youtube.com"))
+    return "YouTube Shorts";
   if (u.includes("instagram.com")) return "Instagram";
   return "Desconhecida";
 }
 
-function formatDuration(sec?: number) {
-  if (!sec || !isFinite(sec)) return "--:--";
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
+function absoluteUrl(pathOrUrl: string): string {
+  if (!pathOrUrl) return pathOrUrl;
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  return `${API_URL}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
+}
+
+function extractProcessedUrl(data: any): { editedUrl?: string; downloadUrl?: string } {
+  if (!data || typeof data !== "object") return {};
+  const edited =
+    data.processed_url ||
+    data.output_url ||
+    data.video_url ||
+    data.url ||
+    data.edited_url ||
+    data.result_url;
+  const download = data.download_url || data.file_url || edited;
+  return {
+    editedUrl: edited ? absoluteUrl(edited) : undefined,
+    downloadUrl: download ? absoluteUrl(download) : undefined,
+  };
 }
 
 function Index() {
   const [link, setLink] = useState("");
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
-  const [processing, setProcessing] = useState(false);
   const [muteAudio, setMuteAudio] = useState(false);
   const [addIntroOutro, setAddIntroOutro] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -90,25 +101,81 @@ function Index() {
   );
 
   const selected = videos.find((v) => v.id === selectedId) ?? null;
+  const anyProcessing = videos.some((v) => v.status === "processing");
+
+  const updateVideo = (id: string, patch: Partial<VideoItem>) =>
+    setVideos((vs) => vs.map((v) => (v.id === id ? { ...v, ...patch } : v)));
+
+  const processUpload = async (item: VideoItem, file: File) => {
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("mute", String(muteAudio));
+      form.append("intro_outro", String(addIntroOutro));
+
+      const res = await fetch(`${API_URL}/api/video/upload`, {
+        method: "POST",
+        body: form,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+      const data = await res.json().catch(() => ({}));
+      const { editedUrl, downloadUrl } = extractProcessedUrl(data);
+      updateVideo(item.id, {
+        status: "done",
+        editedUrl,
+        downloadUrl,
+      });
+      toast.success(`"${item.name}" processado com sucesso!`);
+    } catch (err: any) {
+      updateVideo(item.id, { status: "error", errorMessage: err?.message ?? "Falha" });
+      toast.error(`Erro ao processar: ${err?.message ?? "desconhecido"}`);
+    }
+  };
+
+  const processLink = async (item: VideoItem) => {
+    try {
+      const res = await fetch(`${API_URL}/api/video/download`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: item.originalUrl,
+          mute: muteAudio,
+          intro_outro: addIntroOutro,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+      const data = await res.json().catch(() => ({}));
+      const { editedUrl, downloadUrl } = extractProcessedUrl(data);
+      updateVideo(item.id, {
+        status: "done",
+        editedUrl,
+        downloadUrl,
+      });
+      toast.success(`Vídeo processado com sucesso!`);
+    } catch (err: any) {
+      updateVideo(item.id, { status: "error", errorMessage: err?.message ?? "Falha" });
+      toast.error(`Erro ao processar: ${err?.message ?? "desconhecido"}`);
+    }
+  };
 
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const newItems: VideoItem[] = Array.from(files)
-      .filter((f) => f.type.startsWith("video/"))
-      .map((f) => ({
-        id: crypto.randomUUID(),
-        name: f.name,
-        source: "upload",
-        url: URL.createObjectURL(f),
-        status: "idle",
-      }));
-    if (newItems.length === 0) {
+    const list = Array.from(files).filter((f) => f.type.startsWith("video/"));
+    if (list.length === 0) {
       toast.error("Selecione arquivos de vídeo válidos (MP4).");
       return;
     }
-    setVideos((v) => [...newItems, ...v]);
-    setSelectedId(newItems[0].id);
-    toast.success(`${newItems.length} vídeo(s) adicionado(s).`);
+    const created: VideoItem[] = list.map((f) => ({
+      id: crypto.randomUUID(),
+      name: f.name,
+      source: "upload",
+      originalUrl: URL.createObjectURL(f),
+      status: "processing",
+    }));
+    setVideos((v) => [...created, ...v]);
+    setSelectedId(created[0].id);
+    toast.info(`Enviando ${created.length} vídeo(s) ao servidor…`);
+    created.forEach((item, idx) => processUpload(item, list[idx]));
   };
 
   const handleImportLink = () => {
@@ -120,40 +187,14 @@ function Index() {
       name: url.slice(0, 60) + (url.length > 60 ? "…" : ""),
       source: "link",
       platform,
-      url,
-      status: "idle",
+      originalUrl: url,
+      status: "processing",
     };
     setVideos((v) => [item, ...v]);
     setSelectedId(item.id);
     setLink("");
-    toast.success(`Link importado (${platform}). Backend cuidará do download.`);
-  };
-
-  const handleApplyEdits = async () => {
-    if (videos.length === 0) return toast.error("Adicione um vídeo antes.");
-    setProcessing(true);
-    setProgress(0);
-    setVideos((vs) => vs.map((v) => ({ ...v, status: "processing" })));
-
-    // Simulated progress — real work happens on the FastAPI backend.
-    await new Promise<void>((resolve) => {
-      let p = 0;
-      const timer = setInterval(() => {
-        p += Math.random() * 12 + 3;
-        if (p >= 100) {
-          p = 100;
-          clearInterval(timer);
-          resolve();
-        }
-        setProgress(Math.min(100, Math.round(p)));
-      }, 250);
-    });
-
-    setVideos((vs) =>
-      vs.map((v) => ({ ...v, status: "done", editedUrl: v.url })),
-    );
-    setProcessing(false);
-    toast.success("Edições aplicadas com sucesso!");
+    toast.info(`Enviando link (${platform}) ao servidor…`);
+    processLink(item);
   };
 
   const removeVideo = (id: string) => {
@@ -161,11 +202,27 @@ function Index() {
     if (selectedId === id) setSelectedId(null);
   };
 
+  const downloadCount = videos.filter((v) => v.status === "done" && v.downloadUrl).length;
+
+  const handleDownloadAll = () => {
+    videos
+      .filter((v) => v.status === "done" && v.downloadUrl)
+      .forEach((v) => {
+        const a = document.createElement("a");
+        a.href = v.downloadUrl!;
+        a.download = v.name || "video.mp4";
+        a.target = "_blank";
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Toaster theme="dark" position="top-right" richColors />
 
-      {/* Header */}
       <header className="border-b border-border/60 bg-gradient-to-b from-primary/5 to-transparent">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5">
           <div className="flex items-center gap-3">
@@ -173,12 +230,8 @@ function Index() {
               <Film className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold tracking-tight">
-                Shorts Enhancer Studio
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                Edição criativa para vídeos curtos
-              </p>
+              <h1 className="text-lg font-semibold tracking-tight">Shorts Enhancer Studio</h1>
+              <p className="text-xs text-muted-foreground">Edição criativa para vídeos curtos</p>
             </div>
           </div>
           <Badge variant="outline" className="hidden sm:inline-flex">
@@ -194,7 +247,6 @@ function Index() {
             1. Importar vídeo
           </h2>
           <div className="grid gap-4 md:grid-cols-2">
-            {/* Link */}
             <Card className="border-border/60 bg-card/50 p-5 backdrop-blur">
               <div className="mb-3 flex items-center gap-2">
                 <Link2 className="h-4 w-4 text-fuchsia-400" />
@@ -209,9 +261,13 @@ function Index() {
                   value={link}
                   onChange={(e) => setLink(e.target.value)}
                   className="h-11 flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleImportLink();
+                  }}
                 />
-                <Button onClick={handleImportLink} className="h-11 px-5">
-                  Importar
+                <Button onClick={handleImportLink} disabled={anyProcessing} className="h-11 px-5">
+                  {anyProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Processar
                 </Button>
               </div>
               {detectedPlatform && (
@@ -223,7 +279,6 @@ function Index() {
               )}
             </Card>
 
-            {/* Upload */}
             <Card className="border-border/60 bg-card/50 p-5 backdrop-blur">
               <div className="mb-3 flex items-center gap-2">
                 <Upload className="h-4 w-4 text-indigo-400" />
@@ -235,7 +290,8 @@ function Index() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="group flex h-[104px] w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border/70 bg-background/40 transition hover:border-indigo-400/70 hover:bg-indigo-500/5"
+                disabled={anyProcessing}
+                className="group flex h-[104px] w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border/70 bg-background/40 transition hover:border-indigo-400/70 hover:bg-indigo-500/5 disabled:opacity-60"
               >
                 <Upload className="h-6 w-6 text-muted-foreground transition group-hover:text-indigo-400" />
                 <span className="text-sm text-muted-foreground">
@@ -248,7 +304,10 @@ function Index() {
                 accept="video/mp4,video/*"
                 multiple
                 hidden
-                onChange={(e) => handleFiles(e.target.files)}
+                onChange={(e) => {
+                  handleFiles(e.target.files);
+                  e.target.value = "";
+                }}
               />
             </Card>
           </div>
@@ -275,12 +334,23 @@ function Index() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{v.name}</div>
                     <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{formatDuration(v.duration)}</span>
-                      {v.platform && <Badge variant="outline" className="h-4 px-1.5 text-[10px]">{v.platform}</Badge>}
+                      {v.platform && (
+                        <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
+                          {v.platform}
+                        </Badge>
+                      )}
+                      {v.status === "processing" && (
+                        <span className="flex items-center gap-1 text-indigo-300">
+                          <Loader2 className="h-3 w-3 animate-spin" /> processando…
+                        </span>
+                      )}
                       {v.status === "done" && (
                         <span className="flex items-center gap-1 text-emerald-400">
                           <CheckCircle2 className="h-3 w-3" /> pronto
                         </span>
+                      )}
+                      {v.status === "error" && (
+                        <span className="text-destructive">erro: {v.errorMessage}</span>
                       )}
                     </div>
                   </div>
@@ -301,10 +371,10 @@ function Index() {
           </section>
         )}
 
-        {/* Edits panel */}
+        {/* Edits panel (options for the next request) */}
         <section>
           <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-muted-foreground">
-            2. Edições automáticas
+            2. Edições automáticas aplicadas
           </h2>
           <Card className="border-border/60 bg-card/50 p-5">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -343,27 +413,15 @@ function Index() {
               </div>
             </div>
 
-            <div className="mt-6">
-              <Button
-                size="lg"
-                onClick={handleApplyEdits}
-                disabled={processing || videos.length === 0}
-                className="h-14 w-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-base font-semibold shadow-lg shadow-fuchsia-500/20 hover:opacity-95"
-              >
-                {processing ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Processando… {progress}%
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-5 w-5" />
-                    Aplicar Edições Automáticas
-                  </>
-                )}
-              </Button>
-              {processing && <Progress value={progress} className="mt-3 h-2" />}
-            </div>
+            {anyProcessing && (
+              <div className="mt-6">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin text-fuchsia-400" />
+                  Processando no servidor… isso pode levar alguns segundos.
+                </div>
+                <Progress value={65} className="mt-3 h-2 animate-pulse" />
+              </div>
+            )}
           </Card>
         </section>
 
@@ -373,8 +431,26 @@ function Index() {
             3. Preview
           </h2>
           <div className="grid gap-4 md:grid-cols-2">
-            <PreviewCard title="Original" src={selected?.source === "upload" ? selected.url : undefined} placeholder="Selecione um vídeo" />
-            <PreviewCard title="Editado" src={selected?.editedUrl} placeholder="Aplique as edições" accent />
+            <PreviewCard
+              title="Original"
+              src={selected?.source === "upload" ? selected.originalUrl : undefined}
+              placeholder={
+                selected?.source === "link"
+                  ? "Preview do link fica indisponível — veja o resultado processado"
+                  : "Selecione um vídeo"
+              }
+            />
+            <PreviewCard
+              title="Editado"
+              src={selected?.editedUrl}
+              loading={selected?.status === "processing"}
+              placeholder={
+                selected?.status === "error"
+                  ? `Erro: ${selected.errorMessage}`
+                  : "Aguardando processamento"
+              }
+              accent
+            />
           </div>
         </section>
 
@@ -390,19 +466,30 @@ function Index() {
                 Exportação em alta qualidade (MP4 H.264 + AAC)
               </div>
             </div>
-            <Button
-              size="lg"
-              disabled={!videos.some((v) => v.status === "done")}
-              className="h-11"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Baixar {videos.filter((v) => v.status === "done").length || ""} vídeo(s)
-            </Button>
+            <div className="flex gap-2">
+              {selected?.downloadUrl && (
+                <Button asChild variant="secondary" size="lg" className="h-11">
+                  <a href={selected.downloadUrl} download={selected.name} target="_blank" rel="noopener">
+                    <Download className="mr-2 h-4 w-4" />
+                    Baixar selecionado
+                  </a>
+                </Button>
+              )}
+              <Button
+                size="lg"
+                disabled={downloadCount === 0}
+                onClick={handleDownloadAll}
+                className="h-11"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Baixar {downloadCount || ""} vídeo(s)
+              </Button>
+            </div>
           </Card>
         </section>
 
         <footer className="pb-6 pt-4 text-center text-xs text-muted-foreground">
-          Backend em FastAPI — processamento real ocorre no servidor.
+          Backend: {API_URL || "não configurado"}
         </footer>
       </main>
     </div>
@@ -414,11 +501,13 @@ function PreviewCard({
   src,
   placeholder,
   accent,
+  loading,
 }: {
   title: string;
   src?: string;
   placeholder: string;
   accent?: boolean;
+  loading?: boolean;
 }) {
   return (
     <Card
@@ -428,13 +517,20 @@ function PreviewCard({
     >
       <div className="flex items-center justify-between border-b border-border/60 px-4 py-2">
         <span className="text-sm font-medium">{title}</span>
-        {accent && <Badge className="bg-fuchsia-500/20 text-fuchsia-300 hover:bg-fuchsia-500/20">novo</Badge>}
+        {accent && (
+          <Badge className="bg-fuchsia-500/20 text-fuchsia-300 hover:bg-fuchsia-500/20">novo</Badge>
+        )}
       </div>
       <div className="flex aspect-[9/16] max-h-[420px] w-full items-center justify-center bg-black/60">
-        {src ? (
+        {loading ? (
+          <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin text-fuchsia-400" />
+            Processando…
+          </div>
+        ) : src ? (
           <video src={src} controls className="h-full w-full object-contain" />
         ) : (
-          <span className="text-sm text-muted-foreground">{placeholder}</span>
+          <span className="px-4 text-center text-sm text-muted-foreground">{placeholder}</span>
         )}
       </div>
     </Card>
