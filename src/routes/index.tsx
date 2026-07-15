@@ -280,7 +280,7 @@ function Index() {
 
       // Step 2: process
       const data = await callProcess(fileId, { muteAudio, addIntroOutro });
-      const { editedUrl, downloadUrl } = extractProcessedUrl({ ...upData, ...data });
+      const { editedUrl, downloadUrl } = extractProcessedUrl(data);
       if (!editedUrl) throw new Error("Backend não retornou URL do vídeo processado");
       const done = { ...item, status: "done" as const, editedUrl, downloadUrl };
       updateVideo(item.id, { status: "done", editedUrl, downloadUrl });
