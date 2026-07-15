@@ -85,18 +85,50 @@ function absoluteUrl(pathOrUrl: string): string {
 
 function extractProcessedUrl(data: any): { editedUrl?: string; downloadUrl?: string } {
   if (!data || typeof data !== "object") return {};
-  const edited =
+  const filename =
+    data.processed_filename || data.output_filename || data.result_filename || data.filename;
+  let edited: string | undefined =
     data.processed_url ||
     data.output_url ||
     data.video_url ||
     data.url ||
     data.edited_url ||
     data.result_url;
+  if (!edited && filename) edited = `/api/video/result/${filename}`;
   const download = data.download_url || data.file_url || edited;
   return {
     editedUrl: edited ? absoluteUrl(edited) : undefined,
     downloadUrl: download ? absoluteUrl(download) : undefined,
   };
+}
+
+async function parseError(res: Response): Promise<string> {
+  const text = await res.text().catch(() => "");
+  try {
+    const j = JSON.parse(text);
+    if (typeof j?.detail === "string") return j.detail;
+    if (Array.isArray(j?.detail)) return j.detail.map((d: any) => d.msg).join("; ");
+  } catch {
+    /* ignore */
+  }
+  return text || `HTTP ${res.status}`;
+}
+
+async function callProcess(
+  fileId: string,
+  opts: { muteAudio: boolean; addIntroOutro: boolean },
+): Promise<any> {
+  const body = new URLSearchParams();
+  body.set("file_id", fileId);
+  body.set("remove_audio", String(opts.muteAudio));
+  body.set("fade", String(opts.addIntroOutro));
+  const res = await fetch(`${API_URL}/api/video/process`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json().catch(() => ({}));
 }
 
 function Index() {
