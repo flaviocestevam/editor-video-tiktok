@@ -56,6 +56,18 @@ type VideoItem = {
   errorMessage?: string;
 };
 
+type HistoryItem = {
+  id: string;
+  name: string;
+  platform?: Platform;
+  source: "link" | "upload";
+  editedUrl?: string;
+  downloadUrl?: string;
+  processedAt: number;
+};
+
+const HISTORY_KEY = "shorts-enhancer:history";
+
 function detectPlatform(url: string): Platform {
   const u = url.toLowerCase();
   if (u.includes("tiktok.com")) return "TikTok";
@@ -140,6 +152,38 @@ function Index() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anyProcessing]);
 
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      if (raw) setHistory(JSON.parse(raw));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const saveHistory = (h: HistoryItem[]) => {
+    setHistory(h);
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+    } catch {
+      /* ignore */
+    }
+  };
+  const addToHistory = (item: VideoItem) => {
+    const entry: HistoryItem = {
+      id: item.id,
+      name: item.name,
+      platform: item.platform,
+      source: item.source,
+      editedUrl: item.editedUrl,
+      downloadUrl: item.downloadUrl,
+      processedAt: Date.now(),
+    };
+    saveHistory([entry, ...history.filter((h) => h.id !== item.id)].slice(0, 50));
+  };
+  const removeFromHistory = (id: string) => saveHistory(history.filter((h) => h.id !== id));
+  const clearHistory = () => saveHistory([]);
+
   const updateVideo = (id: string, patch: Partial<VideoItem>) =>
     setVideos((vs) => vs.map((v) => (v.id === id ? { ...v, ...patch } : v)));
 
@@ -158,11 +202,9 @@ function Index() {
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       const data = await res.json().catch(() => ({}));
       const { editedUrl, downloadUrl } = extractProcessedUrl(data);
-      updateVideo(item.id, {
-        status: "done",
-        editedUrl,
-        downloadUrl,
-      });
+      const done = { ...item, status: "done" as const, editedUrl, downloadUrl };
+      updateVideo(item.id, { status: "done", editedUrl, downloadUrl });
+      addToHistory(done);
       toast.success(`"${item.name}" processado com sucesso!`);
     } catch (err: any) {
       updateVideo(item.id, { status: "error", errorMessage: err?.message ?? "Falha" });
@@ -185,11 +227,9 @@ function Index() {
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       const data = await res.json().catch(() => ({}));
       const { editedUrl, downloadUrl } = extractProcessedUrl(data);
-      updateVideo(item.id, {
-        status: "done",
-        editedUrl,
-        downloadUrl,
-      });
+      const done = { ...item, status: "done" as const, editedUrl, downloadUrl };
+      updateVideo(item.id, { status: "done", editedUrl, downloadUrl });
+      addToHistory(done);
       toast.success(`Vídeo processado com sucesso!`);
     } catch (err: any) {
       updateVideo(item.id, { status: "error", errorMessage: err?.message ?? "Falha" });
@@ -602,6 +642,76 @@ function Index() {
             </div>
           </Card>
         </section>
+
+        {/* History */}
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+              Histórico de vídeos processados {history.length > 0 && `(${history.length})`}
+            </h2>
+            {history.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={clearHistory} className="text-xs">
+                <Trash2 className="mr-1 h-3 w-3" /> Limpar histórico
+              </Button>
+            )}
+          </div>
+          {history.length === 0 ? (
+            <Card className="border-dashed border-border/60 bg-card/30 p-8 text-center text-sm text-muted-foreground">
+              Nenhum vídeo processado ainda. O histórico é salvo no seu navegador.
+            </Card>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {history.map((h) => (
+                <Card key={h.id} className="overflow-hidden border-border/60 bg-card/50">
+                  <div className="relative aspect-[9/16] max-h-56 w-full bg-black/60">
+                    {h.editedUrl ? (
+                      <video src={h.editedUrl} className="h-full w-full object-contain" preload="metadata" muted />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                        Sem preview
+                      </div>
+                    )}
+                    {h.platform && (
+                      <Badge className="absolute left-2 top-2 h-5 bg-black/60 px-2 text-[10px]">
+                        {h.platform}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <div className="truncate text-sm font-medium" title={h.name}>
+                      {h.name}
+                    </div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                      {new Date(h.processedAt).toLocaleString("pt-BR")}
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      {h.downloadUrl ? (
+                        <Button asChild size="sm" className="flex-1">
+                          <a href={h.downloadUrl} download={h.name} target="_blank" rel="noopener">
+                            <Download className="mr-1.5 h-3.5 w-3.5" /> Baixar
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button size="sm" className="flex-1" disabled>
+                          Indisponível
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeFromHistory(h.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
+
 
         <footer className="pb-6 pt-4 text-center text-xs text-muted-foreground">
           Backend: {API_URL || "não configurado"}
