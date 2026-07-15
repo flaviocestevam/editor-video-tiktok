@@ -228,13 +228,16 @@ function Index() {
       /* ignore */
     }
   }, []);
-  const saveHistory = (h: HistoryItem[]) => {
-    setHistory(h);
+  const persistHistory = (h: HistoryItem[]) => {
     try {
       localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
     } catch {
       /* ignore */
     }
+  };
+  const saveHistory = (h: HistoryItem[]) => {
+    setHistory(h);
+    persistHistory(h);
   };
   const addToHistory = (item: VideoItem) => {
     const entry: HistoryItem = {
@@ -246,8 +249,13 @@ function Index() {
       downloadUrl: item.downloadUrl,
       processedAt: Date.now(),
     };
-    saveHistory([entry, ...history.filter((h) => h.id !== item.id)].slice(0, 50));
+    setHistory((prev) => {
+      const next = [entry, ...prev.filter((h) => h.id !== item.id)].slice(0, 50);
+      persistHistory(next);
+      return next;
+    });
   };
+
   const removeFromHistory = (id: string) => saveHistory(history.filter((h) => h.id !== id));
   const clearHistory = () => saveHistory([]);
 
@@ -272,7 +280,7 @@ function Index() {
 
       // Step 2: process
       const data = await callProcess(fileId, { muteAudio, addIntroOutro });
-      const { editedUrl, downloadUrl } = extractProcessedUrl({ ...upData, ...data });
+      const { editedUrl, downloadUrl } = extractProcessedUrl(data);
       if (!editedUrl) throw new Error("Backend não retornou URL do vídeo processado");
       const done = { ...item, status: "done" as const, editedUrl, downloadUrl };
       updateVideo(item.id, { status: "done", editedUrl, downloadUrl });
@@ -310,7 +318,7 @@ function Index() {
 
       // Step 2: process
       const data = await callProcess(fileId, { muteAudio, addIntroOutro });
-      const { editedUrl, downloadUrl } = extractProcessedUrl({ ...dlData, ...data });
+      const { editedUrl, downloadUrl } = extractProcessedUrl(data);
       if (!editedUrl) throw new Error("Backend não retornou URL do vídeo processado");
       const done = { ...item, status: "done" as const, editedUrl, downloadUrl };
       updateVideo(item.id, { status: "done", editedUrl, downloadUrl });
