@@ -202,11 +202,9 @@ function Index() {
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       const data = await res.json().catch(() => ({}));
       const { editedUrl, downloadUrl } = extractProcessedUrl(data);
-      updateVideo(item.id, {
-        status: "done",
-        editedUrl,
-        downloadUrl,
-      });
+      const done = { ...item, status: "done" as const, editedUrl, downloadUrl };
+      updateVideo(item.id, { status: "done", editedUrl, downloadUrl });
+      addToHistory(done);
       toast.success(`"${item.name}" processado com sucesso!`);
     } catch (err: any) {
       updateVideo(item.id, { status: "error", errorMessage: err?.message ?? "Falha" });
