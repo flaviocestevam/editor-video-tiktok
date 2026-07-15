@@ -174,12 +174,12 @@ function Index() {
       name: f.name,
       source: "upload",
       originalUrl: URL.createObjectURL(f),
-      status: "processing",
+      status: "idle",
     }));
+    created.forEach((item, idx) => fileMap.current.set(item.id, list[idx]));
     setVideos((v) => [...created, ...v]);
     setSelectedId(created[0].id);
-    toast.info(`Enviando ${created.length} vídeo(s) ao servidor…`);
-    created.forEach((item, idx) => processUpload(item, list[idx]));
+    toast.success(`${created.length} vídeo(s) adicionado(s). Clique em "Iniciar" para processar.`);
   };
 
   const handleImportLink = () => {
@@ -192,13 +192,29 @@ function Index() {
       source: "link",
       platform,
       originalUrl: url,
-      status: "processing",
+      status: "idle",
     };
     setVideos((v) => [item, ...v]);
     setSelectedId(item.id);
     setLink("");
-    toast.info(`Enviando link (${platform}) ao servidor…`);
-    processLink(item);
+    toast.success(`Link adicionado (${platform}). Clique em "Iniciar" para processar.`);
+  };
+
+  const startVideo = (item: VideoItem) => {
+    if (item.source === "upload") {
+      const file = fileMap.current.get(item.id);
+      if (!file) return toast.error("Arquivo indisponível, reenvie.");
+      processUpload(item, file);
+    } else {
+      processLink(item);
+    }
+  };
+
+  const startAll = () => {
+    const pending = videos.filter((v) => v.status === "idle" || v.status === "error");
+    if (pending.length === 0) return toast.info("Nada para processar.");
+    toast.info(`Iniciando ${pending.length} vídeo(s)…`);
+    pending.forEach(startVideo);
   };
 
   const removeVideo = (id: string) => {
