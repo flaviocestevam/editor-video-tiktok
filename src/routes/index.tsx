@@ -56,6 +56,18 @@ type VideoItem = {
   errorMessage?: string;
 };
 
+type HistoryItem = {
+  id: string;
+  name: string;
+  platform?: Platform;
+  source: "link" | "upload";
+  editedUrl?: string;
+  downloadUrl?: string;
+  processedAt: number;
+};
+
+const HISTORY_KEY = "shorts-enhancer:history";
+
 function detectPlatform(url: string): Platform {
   const u = url.toLowerCase();
   if (u.includes("tiktok.com")) return "TikTok";
