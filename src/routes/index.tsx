@@ -108,10 +108,41 @@ async function parseError(res: Response): Promise<string> {
     const j = JSON.parse(text);
     if (typeof j?.detail === "string") return j.detail;
     if (Array.isArray(j?.detail)) return j.detail.map((d: any) => d.msg).join("; ");
+    if (typeof j?.message === "string") return j.message;
+    if (typeof j?.error === "string") return j.error;
   } catch {
     /* ignore */
   }
-  return text || `HTTP ${res.status}`;
+  return text || `HTTP ${res.status} ${res.statusText}`;
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs = 120_000,
+): Promise<Response> {
+  if (!API_URL) {
+    throw new Error(
+      "VITE_API_URL não está configurada. Defina no .env: VITE_API_URL=https://editor-video-tiktok-backend-production.up.railway.app",
+    );
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err: any) {
+    if (err?.name === "AbortError") {
+      throw new Error(`Tempo esgotado após ${Math.round(timeoutMs / 1000)}s. O servidor demorou demais para responder.`);
+    }
+    if (err instanceof TypeError && /fetch/i.test(err.message)) {
+      throw new Error(
+        `Falha de rede ao acessar ${url}. Verifique sua conexão, se o backend está online e se o CORS está liberado.`,
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function callProcess(
@@ -122,11 +153,15 @@ async function callProcess(
   body.set("file_id", fileId);
   body.set("remove_audio", String(opts.muteAudio));
   body.set("fade", String(opts.addIntroOutro));
-  const res = await fetch(`${API_URL}/api/video/process`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
+  const res = await fetchWithTimeout(
+    `${API_URL}/api/video/process`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      body: body.toString(),
+    },
+    180_000,
+  );
   if (!res.ok) throw new Error(await parseError(res));
   return res.json().catch(() => ({}));
 }
@@ -225,7 +260,11 @@ function Index() {
       // Step 1: upload file → file_id
       const form = new FormData();
       form.append("file", file);
-      const upRes = await fetch(`${API_URL}/api/video/upload`, { method: "POST", body: form });
+      const upRes = await fetchWithTimeout(
+        `${API_URL}/api/video/upload`,
+        { method: "POST", body: form, headers: { Accept: "application/json" } },
+        180_000,
+      );
       if (!upRes.ok) throw new Error(await parseError(upRes));
       const upData = await upRes.json().catch(() => ({}));
       const fileId = upData.file_id || upData.id;
@@ -252,11 +291,18 @@ function Index() {
       // Step 1: download by link → file_id
       const body = new URLSearchParams();
       body.set("url", item.originalUrl);
-      const dlRes = await fetch(`${API_URL}/api/video/download`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: body.toString(),
-      });
+      const dlRes = await fetchWithTimeout(
+        `${API_URL}/api/video/download`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "application/json",
+          },
+          body: body.toString(),
+        },
+        180_000,
+      );
       if (!dlRes.ok) throw new Error(await parseError(dlRes));
       const dlData = await dlRes.json().catch(() => ({}));
       const fileId = dlData.file_id || dlData.id;
