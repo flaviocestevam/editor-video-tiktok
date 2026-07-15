@@ -378,11 +378,27 @@ function Index() {
                           <CheckCircle2 className="h-3 w-3" /> pronto
                         </span>
                       )}
+                      {v.status === "idle" && (
+                        <span className="text-muted-foreground">aguardando início</span>
+                      )}
                       {v.status === "error" && (
                         <span className="text-destructive">erro: {v.errorMessage}</span>
                       )}
                     </div>
                   </div>
+                  {(v.status === "idle" || v.status === "error") && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startVideo(v);
+                      }}
+                      className="rounded-md bg-primary/90 px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary"
+                    >
+                      Iniciar
+                    </span>
+                  )}
                   <span
                     role="button"
                     tabIndex={0}
