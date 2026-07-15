@@ -512,13 +512,29 @@ function Index() {
               </div>
             )}
 
-            {anyProcessing && (
-              <div className="mt-6">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin text-fuchsia-400" />
-                  Processando no servidor… isso pode levar alguns segundos.
+            {(anyProcessing || progress > 0) && (
+              <div className="mt-6 rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/5 p-4">
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 font-medium">
+                    {anyProcessing ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-fuchsia-400" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                    )}
+                    <span className="animate-fade-in" key={stageIdx}>
+                      {anyProcessing ? stages[stageIdx] : "Concluído!"}
+                    </span>
+                  </div>
+                  <span className="tabular-nums font-semibold text-fuchsia-300">
+                    {Math.round(progress)}%
+                  </span>
                 </div>
-                <Progress value={65} className="mt-3 h-2 animate-pulse" />
+                <Progress value={progress} className="h-2.5" />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {anyProcessing
+                    ? "Não feche a página — o processamento continua no servidor."
+                    : "Seu vídeo está pronto para download abaixo."}
+                </p>
               </div>
             )}
           </Card>
