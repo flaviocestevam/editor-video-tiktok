@@ -77,14 +77,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Shorts Enhancer Studio — Edite e aprimore vídeos curtos" },
+      { name: "description", content: "Importe, aprimore e exporte vídeos curtos do TikTok, YouTube Shorts e Instagram Reels com edições automáticas." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Shorts Enhancer Studio — Edite e aprimore vídeos curtos" },
+      { property: "og:description", content: "Importe, aprimore e exporte vídeos curtos do TikTok, YouTube Shorts e Instagram Reels com edições automáticas." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Shorts Enhancer Studio — Edite e aprimore vídeos curtos" },
+      { name: "twitter:description", content: "Importe, aprimore e exporte vídeos curtos do TikTok, YouTube Shorts e Instagram Reels com edições automáticas." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7c12958e-d476-4937-a24f-eb3a40bed70b/id-preview-63cc662a--98b6db11-87fd-42c9-ae4a-4f6f784051af.lovable.app-1784120522403.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7c12958e-d476-4937-a24f-eb3a40bed70b/id-preview-63cc662a--98b6db11-87fd-42c9-ae4a-4f6f784051af.lovable.app-1784120522403.png" },
     ],
     links: [
       {

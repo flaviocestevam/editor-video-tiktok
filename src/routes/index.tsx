@@ -35,11 +35,11 @@ export const Route = createFileRoute("/")({
         content:
           "Importe, aprimore e exporte vídeos curtos do TikTok, YouTube Shorts e Instagram Reels com edições automáticas.",
       },
-      { property: "og:title", content: "Shorts Enhancer Studio" },
+      { property: "og:title", content: "Shorts Enhancer Studio — Edite e aprimore vídeos curtos" },
       {
         property: "og:description",
         content:
-          "Ferramenta criativa para editar e aprimorar vídeos curtos automaticamente.",
+          "Importe, aprimore e exporte vídeos curtos do TikTok, YouTube Shorts e Instagram Reels com edições automáticas.",
       },
     ],
   }),
