@@ -285,9 +285,8 @@ function Index() {
                     if (e.key === "Enter") handleImportLink();
                   }}
                 />
-                <Button onClick={handleImportLink} disabled={anyProcessing} className="h-11 px-5">
-                  {anyProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Processar
+                <Button onClick={handleImportLink} className="h-11 px-5">
+                  Adicionar
                 </Button>
               </div>
               {detectedPlatform && (
