@@ -105,6 +105,41 @@ function Index() {
 
   const fileMap = useRef<Map<string, File>>(new Map());
 
+  const [progress, setProgress] = useState(0);
+  const [stageIdx, setStageIdx] = useState(0);
+  const stages = [
+    "Enviando vídeo ao servidor…",
+    "Baixando vídeo…",
+    "Analisando faixas de áudio e vídeo…",
+    "Aplicando edições automáticas…",
+    "Ajustando cor, brilho e contraste…",
+    "Re-codificando vídeo (H.264 + AAC)…",
+    "Quase pronto…",
+  ];
+
+  useEffect(() => {
+    if (!anyProcessing) {
+      if (progress > 0) setProgress(100);
+      const t = setTimeout(() => {
+        setProgress(0);
+        setStageIdx(0);
+      }, 800);
+      return () => clearTimeout(t);
+    }
+    setProgress((p) => (p < 5 ? 5 : p));
+    const id = setInterval(() => {
+      setProgress((p) => {
+        if (p >= 92) return p;
+        // slow down as it gets higher
+        const step = p < 40 ? 4 : p < 70 ? 2 : 1;
+        return Math.min(92, p + step);
+      });
+      setStageIdx((s) => (s + 1) % stages.length);
+    }, 1400);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anyProcessing]);
+
   const updateVideo = (id: string, patch: Partial<VideoItem>) =>
     setVideos((vs) => vs.map((v) => (v.id === id ? { ...v, ...patch } : v)));
 
