@@ -103,10 +103,13 @@ function Index() {
   const selected = videos.find((v) => v.id === selectedId) ?? null;
   const anyProcessing = videos.some((v) => v.status === "processing");
 
+  const fileMap = useRef<Map<string, File>>(new Map());
+
   const updateVideo = (id: string, patch: Partial<VideoItem>) =>
     setVideos((vs) => vs.map((v) => (v.id === id ? { ...v, ...patch } : v)));
 
   const processUpload = async (item: VideoItem, file: File) => {
+    updateVideo(item.id, { status: "processing", errorMessage: undefined });
     try {
       const form = new FormData();
       form.append("file", file);
@@ -133,6 +136,7 @@ function Index() {
   };
 
   const processLink = async (item: VideoItem) => {
+    updateVideo(item.id, { status: "processing", errorMessage: undefined });
     try {
       const res = await fetch(`${API_URL}/api/video/download`, {
         method: "POST",
@@ -170,12 +174,12 @@ function Index() {
       name: f.name,
       source: "upload",
       originalUrl: URL.createObjectURL(f),
-      status: "processing",
+      status: "idle",
     }));
+    created.forEach((item, idx) => fileMap.current.set(item.id, list[idx]));
     setVideos((v) => [...created, ...v]);
     setSelectedId(created[0].id);
-    toast.info(`Enviando ${created.length} vídeo(s) ao servidor…`);
-    created.forEach((item, idx) => processUpload(item, list[idx]));
+    toast.success(`${created.length} vídeo(s) adicionado(s). Clique em "Iniciar" para processar.`);
   };
 
   const handleImportLink = () => {
@@ -188,13 +192,29 @@ function Index() {
       source: "link",
       platform,
       originalUrl: url,
-      status: "processing",
+      status: "idle",
     };
     setVideos((v) => [item, ...v]);
     setSelectedId(item.id);
     setLink("");
-    toast.info(`Enviando link (${platform}) ao servidor…`);
-    processLink(item);
+    toast.success(`Link adicionado (${platform}). Clique em "Iniciar" para processar.`);
+  };
+
+  const startVideo = (item: VideoItem) => {
+    if (item.source === "upload") {
+      const file = fileMap.current.get(item.id);
+      if (!file) return toast.error("Arquivo indisponível, reenvie.");
+      processUpload(item, file);
+    } else {
+      processLink(item);
+    }
+  };
+
+  const startAll = () => {
+    const pending = videos.filter((v) => v.status === "idle" || v.status === "error");
+    if (pending.length === 0) return toast.info("Nada para processar.");
+    toast.info(`Iniciando ${pending.length} vídeo(s)…`);
+    pending.forEach(startVideo);
   };
 
   const removeVideo = (id: string) => {
@@ -265,9 +285,8 @@ function Index() {
                     if (e.key === "Enter") handleImportLink();
                   }}
                 />
-                <Button onClick={handleImportLink} disabled={anyProcessing} className="h-11 px-5">
-                  {anyProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Processar
+                <Button onClick={handleImportLink} className="h-11 px-5">
+                  Adicionar
                 </Button>
               </div>
               {detectedPlatform && (
@@ -316,9 +335,19 @@ function Index() {
         {/* Videos list */}
         {videos.length > 0 && (
           <section>
-            <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-muted-foreground">
-              Seus vídeos ({videos.length})
-            </h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                Seus vídeos ({videos.length})
+              </h2>
+              <Button
+                size="sm"
+                onClick={startAll}
+                disabled={anyProcessing || !videos.some((v) => v.status === "idle" || v.status === "error")}
+              >
+                {anyProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+                Iniciar processamento
+              </Button>
+            </div>
             <div className="grid gap-2">
               {videos.map((v) => (
                 <button
@@ -349,11 +378,27 @@ function Index() {
                           <CheckCircle2 className="h-3 w-3" /> pronto
                         </span>
                       )}
+                      {v.status === "idle" && (
+                        <span className="text-muted-foreground">aguardando início</span>
+                      )}
                       {v.status === "error" && (
                         <span className="text-destructive">erro: {v.errorMessage}</span>
                       )}
                     </div>
                   </div>
+                  {(v.status === "idle" || v.status === "error") && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startVideo(v);
+                      }}
+                      className="rounded-md bg-primary/90 px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary"
+                    >
+                      Iniciar
+                    </span>
+                  )}
                   <span
                     role="button"
                     tabIndex={0}
