@@ -85,18 +85,50 @@ function absoluteUrl(pathOrUrl: string): string {
 
 function extractProcessedUrl(data: any): { editedUrl?: string; downloadUrl?: string } {
   if (!data || typeof data !== "object") return {};
-  const edited =
+  const filename =
+    data.processed_filename || data.output_filename || data.result_filename || data.filename;
+  let edited: string | undefined =
     data.processed_url ||
     data.output_url ||
     data.video_url ||
     data.url ||
     data.edited_url ||
     data.result_url;
+  if (!edited && filename) edited = `/api/video/result/${filename}`;
   const download = data.download_url || data.file_url || edited;
   return {
     editedUrl: edited ? absoluteUrl(edited) : undefined,
     downloadUrl: download ? absoluteUrl(download) : undefined,
   };
+}
+
+async function parseError(res: Response): Promise<string> {
+  const text = await res.text().catch(() => "");
+  try {
+    const j = JSON.parse(text);
+    if (typeof j?.detail === "string") return j.detail;
+    if (Array.isArray(j?.detail)) return j.detail.map((d: any) => d.msg).join("; ");
+  } catch {
+    /* ignore */
+  }
+  return text || `HTTP ${res.status}`;
+}
+
+async function callProcess(
+  fileId: string,
+  opts: { muteAudio: boolean; addIntroOutro: boolean },
+): Promise<any> {
+  const body = new URLSearchParams();
+  body.set("file_id", fileId);
+  body.set("remove_audio", String(opts.muteAudio));
+  body.set("fade", String(opts.addIntroOutro));
+  const res = await fetch(`${API_URL}/api/video/process`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json().catch(() => ({}));
 }
 
 function Index() {
@@ -190,50 +222,58 @@ function Index() {
   const processUpload = async (item: VideoItem, file: File) => {
     updateVideo(item.id, { status: "processing", errorMessage: undefined });
     try {
+      // Step 1: upload file → file_id
       const form = new FormData();
       form.append("file", file);
-      form.append("mute", String(muteAudio));
-      form.append("intro_outro", String(addIntroOutro));
+      const upRes = await fetch(`${API_URL}/api/video/upload`, { method: "POST", body: form });
+      if (!upRes.ok) throw new Error(await parseError(upRes));
+      const upData = await upRes.json().catch(() => ({}));
+      const fileId = upData.file_id || upData.id;
+      if (!fileId) throw new Error("Upload sem file_id na resposta");
 
-      const res = await fetch(`${API_URL}/api/video/upload`, {
-        method: "POST",
-        body: form,
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-      const data = await res.json().catch(() => ({}));
-      const { editedUrl, downloadUrl } = extractProcessedUrl(data);
+      // Step 2: process
+      const data = await callProcess(fileId, { muteAudio, addIntroOutro });
+      const { editedUrl, downloadUrl } = extractProcessedUrl({ ...upData, ...data });
+      if (!editedUrl) throw new Error("Backend não retornou URL do vídeo processado");
       const done = { ...item, status: "done" as const, editedUrl, downloadUrl };
       updateVideo(item.id, { status: "done", editedUrl, downloadUrl });
       addToHistory(done);
       toast.success(`"${item.name}" processado com sucesso!`);
     } catch (err: any) {
-      updateVideo(item.id, { status: "error", errorMessage: err?.message ?? "Falha" });
-      toast.error(`Erro ao processar: ${err?.message ?? "desconhecido"}`);
+      const msg = err?.message ?? "Falha";
+      updateVideo(item.id, { status: "error", errorMessage: msg });
+      toast.error(`Erro ao processar: ${msg}`);
     }
   };
 
   const processLink = async (item: VideoItem) => {
     updateVideo(item.id, { status: "processing", errorMessage: undefined });
     try {
-      const res = await fetch(`${API_URL}/api/video/download`, {
+      // Step 1: download by link → file_id
+      const body = new URLSearchParams();
+      body.set("url", item.originalUrl);
+      const dlRes = await fetch(`${API_URL}/api/video/download`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: item.originalUrl,
-          mute: muteAudio,
-          intro_outro: addIntroOutro,
-        }),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-      const data = await res.json().catch(() => ({}));
-      const { editedUrl, downloadUrl } = extractProcessedUrl(data);
+      if (!dlRes.ok) throw new Error(await parseError(dlRes));
+      const dlData = await dlRes.json().catch(() => ({}));
+      const fileId = dlData.file_id || dlData.id;
+      if (!fileId) throw new Error("Download sem file_id na resposta");
+
+      // Step 2: process
+      const data = await callProcess(fileId, { muteAudio, addIntroOutro });
+      const { editedUrl, downloadUrl } = extractProcessedUrl({ ...dlData, ...data });
+      if (!editedUrl) throw new Error("Backend não retornou URL do vídeo processado");
       const done = { ...item, status: "done" as const, editedUrl, downloadUrl };
       updateVideo(item.id, { status: "done", editedUrl, downloadUrl });
       addToHistory(done);
       toast.success(`Vídeo processado com sucesso!`);
     } catch (err: any) {
-      updateVideo(item.id, { status: "error", errorMessage: err?.message ?? "Falha" });
-      toast.error(`Erro ao processar: ${err?.message ?? "desconhecido"}`);
+      const msg = err?.message ?? "Falha";
+      updateVideo(item.id, { status: "error", errorMessage: msg });
+      toast.error(`Erro ao processar: ${msg}`);
     }
   };
 
