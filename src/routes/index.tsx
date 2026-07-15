@@ -491,19 +491,6 @@ function Index() {
                       )}
                     </div>
                   </div>
-                  {(v.status === "idle" || v.status === "error") && (
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startVideo(v);
-                      }}
-                      className="rounded-md bg-primary/90 px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary"
-                    >
-                      Iniciar
-                    </span>
-                  )}
                   <span
                     role="button"
                     tabIndex={0}
