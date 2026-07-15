@@ -136,6 +136,7 @@ function Index() {
   };
 
   const processLink = async (item: VideoItem) => {
+    updateVideo(item.id, { status: "processing", errorMessage: undefined });
     try {
       const res = await fetch(`${API_URL}/api/video/download`, {
         method: "POST",
