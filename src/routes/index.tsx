@@ -335,19 +335,9 @@ function Index() {
         {/* Videos list */}
         {videos.length > 0 && (
           <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-                Seus vídeos ({videos.length})
-              </h2>
-              <Button
-                size="sm"
-                onClick={startAll}
-                disabled={anyProcessing || !videos.some((v) => v.status === "idle" || v.status === "error")}
-              >
-                {anyProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
-                Iniciar processamento
-              </Button>
-            </div>
+            <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-muted-foreground">
+              Seus vídeos ({videos.length})
+            </h2>
             <div className="grid gap-2">
               {videos.map((v) => (
                 <button
