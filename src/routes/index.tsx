@@ -260,7 +260,11 @@ function Index() {
       // Step 1: upload file → file_id
       const form = new FormData();
       form.append("file", file);
-      const upRes = await fetch(`${API_URL}/api/video/upload`, { method: "POST", body: form });
+      const upRes = await fetchWithTimeout(
+        `${API_URL}/api/video/upload`,
+        { method: "POST", body: form, headers: { Accept: "application/json" } },
+        180_000,
+      );
       if (!upRes.ok) throw new Error(await parseError(upRes));
       const upData = await upRes.json().catch(() => ({}));
       const fileId = upData.file_id || upData.id;
