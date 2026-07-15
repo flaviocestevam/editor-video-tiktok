@@ -228,13 +228,16 @@ function Index() {
       /* ignore */
     }
   }, []);
-  const saveHistory = (h: HistoryItem[]) => {
-    setHistory(h);
+  const persistHistory = (h: HistoryItem[]) => {
     try {
       localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
     } catch {
       /* ignore */
     }
+  };
+  const saveHistory = (h: HistoryItem[]) => {
+    setHistory(h);
+    persistHistory(h);
   };
   const addToHistory = (item: VideoItem) => {
     const entry: HistoryItem = {
@@ -246,8 +249,13 @@ function Index() {
       downloadUrl: item.downloadUrl,
       processedAt: Date.now(),
     };
-    saveHistory([entry, ...history.filter((h) => h.id !== item.id)].slice(0, 50));
+    setHistory((prev) => {
+      const next = [entry, ...prev.filter((h) => h.id !== item.id)].slice(0, 50);
+      persistHistory(next);
+      return next;
+    });
   };
+
   const removeFromHistory = (id: string) => saveHistory(history.filter((h) => h.id !== id));
   const clearHistory = () => saveHistory([]);
 
