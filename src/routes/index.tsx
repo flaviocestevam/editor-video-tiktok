@@ -103,10 +103,13 @@ function Index() {
   const selected = videos.find((v) => v.id === selectedId) ?? null;
   const anyProcessing = videos.some((v) => v.status === "processing");
 
+  const fileMap = useRef<Map<string, File>>(new Map());
+
   const updateVideo = (id: string, patch: Partial<VideoItem>) =>
     setVideos((vs) => vs.map((v) => (v.id === id ? { ...v, ...patch } : v)));
 
   const processUpload = async (item: VideoItem, file: File) => {
+    updateVideo(item.id, { status: "processing", errorMessage: undefined });
     try {
       const form = new FormData();
       form.append("file", file);
