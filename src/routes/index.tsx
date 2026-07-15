@@ -152,6 +152,38 @@ function Index() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anyProcessing]);
 
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      if (raw) setHistory(JSON.parse(raw));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const saveHistory = (h: HistoryItem[]) => {
+    setHistory(h);
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+    } catch {
+      /* ignore */
+    }
+  };
+  const addToHistory = (item: VideoItem) => {
+    const entry: HistoryItem = {
+      id: item.id,
+      name: item.name,
+      platform: item.platform,
+      source: item.source,
+      editedUrl: item.editedUrl,
+      downloadUrl: item.downloadUrl,
+      processedAt: Date.now(),
+    };
+    saveHistory([entry, ...history.filter((h) => h.id !== item.id)].slice(0, 50));
+  };
+  const removeFromHistory = (id: string) => saveHistory(history.filter((h) => h.id !== id));
+  const clearHistory = () => saveHistory([]);
+
   const updateVideo = (id: string, patch: Partial<VideoItem>) =>
     setVideos((vs) => vs.map((v) => (v.id === id ? { ...v, ...patch } : v)));
 
