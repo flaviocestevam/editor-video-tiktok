@@ -291,11 +291,18 @@ function Index() {
       // Step 1: download by link → file_id
       const body = new URLSearchParams();
       body.set("url", item.originalUrl);
-      const dlRes = await fetch(`${API_URL}/api/video/download`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: body.toString(),
-      });
+      const dlRes = await fetchWithTimeout(
+        `${API_URL}/api/video/download`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "application/json",
+          },
+          body: body.toString(),
+        },
+        180_000,
+      );
       if (!dlRes.ok) throw new Error(await parseError(dlRes));
       const dlData = await dlRes.json().catch(() => ({}));
       const fileId = dlData.file_id || dlData.id;
