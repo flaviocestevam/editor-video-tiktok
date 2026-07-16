@@ -451,7 +451,7 @@ function Index() {
       if (!fileId) throw new Error("Upload sem file_id na resposta");
 
       // Step 2: process
-      const data = await callProcess(fileId, edits);
+      const data = await callProcess(fileId, edits, ext);
       const { editedUrl, downloadUrl } = extractProcessedUrl(data);
       if (!editedUrl) throw new Error("Backend não retornou URL do vídeo processado");
       const done = { ...item, status: "done" as const, editedUrl, downloadUrl };
@@ -489,7 +489,7 @@ function Index() {
       if (!fileId) throw new Error("Download sem file_id na resposta");
 
       // Step 2: process
-      const data = await callProcess(fileId, edits);
+      const data = await callProcess(fileId, edits, ext);
       const { editedUrl, downloadUrl } = extractProcessedUrl(data);
       if (!editedUrl) throw new Error("Backend não retornou URL do vídeo processado");
       const done = { ...item, status: "done" as const, editedUrl, downloadUrl };
