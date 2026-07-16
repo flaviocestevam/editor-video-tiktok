@@ -709,7 +709,7 @@ function Index() {
                   { key: "color_adjust", icon: Palette, label: "Cor, brilho, contraste", hint: "Ajustes de saturação" },
                   { key: "fade", icon: Film, label: "Fade intro/outro", hint: "Fade in/out nas bordas" },
                   { key: "remove_audio", icon: Music2, label: "Remover áudio", hint: "Silencia trilha original" },
-                  { key: "strip_metadata", icon: ShieldOff, label: "Remover metadados", hint: "Remove informações técnicas do arquivo" },
+                  { key: "strip_metadata", icon: ShieldOff, label: "Metadados iPhone", hint: "Aplica automaticamente iPhone 15 Pro Max, data atual e Rio de Janeiro" },
                   { key: "sensor_noise", icon: Aperture, label: "Ruído de sensor", hint: "Adiciona grão visual muito sutil" },
                   { key: "output_fps", icon: Timer, label: "29,97 FPS", hint: "Padroniza a taxa de quadros" },
                 ] as { key: keyof EditOptions; icon: typeof Sparkles; label: string; hint: string }[]
