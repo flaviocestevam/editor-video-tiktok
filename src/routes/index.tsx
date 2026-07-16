@@ -239,6 +239,21 @@ type EditOptions = {
   speed_change: boolean;
   color_adjust: boolean;
   fade: boolean;
+  strip_metadata: boolean;
+  sensor_noise: boolean;
+  output_fps: boolean;
+  manual_caption: boolean;
+};
+
+type ColorGrade = "none" | "warm" | "cool" | "cinematic" | "vintage";
+
+type ExtOptions = {
+  crop_pixels: number; // 0-8
+  zoom_factor: number; // 1.00-1.05
+  hue_degrees: number; // -3..+3
+  color_grade: ColorGrade;
+  sensor_noise_level: number; // 1-4
+  manual_caption_text: string;
 };
 
 const DEFAULT_EDITS: EditOptions = {
@@ -249,19 +264,57 @@ const DEFAULT_EDITS: EditOptions = {
   speed_change: true,
   color_adjust: true,
   fade: true,
+  strip_metadata: true,
+  sensor_noise: true,
+  output_fps: true,
+  manual_caption: false,
 };
 
-async function callProcess(fileId: string, opts: EditOptions): Promise<unknown> {
-  const body = new URLSearchParams();
-  body.set("file_id", fileId);
-  (Object.keys(opts) as (keyof EditOptions)[]).forEach((k) => body.set(k, String(opts[k])));
+const DEFAULT_EXT: ExtOptions = {
+  crop_pixels: 4,
+  zoom_factor: 1.02,
+  hue_degrees: 1,
+  color_grade: "none",
+  sensor_noise_level: 2,
+  manual_caption_text: "",
+};
+
+const TOTAL_EDITS = 11;
+
+async function callProcess(
+  fileId: string,
+  opts: EditOptions,
+  ext: ExtOptions,
+): Promise<unknown> {
+  const form = new FormData();
+  form.set("file_id", fileId);
+  // Legacy boolean edits
+  (
+    [
+      "remove_audio",
+      "flip_horizontal",
+      "random_trim",
+      "crop_zoom",
+      "speed_change",
+      "color_adjust",
+      "fade",
+    ] as (keyof EditOptions)[]
+  ).forEach((k) => form.set(k, String(opts[k])));
+
+  // New fields
+  form.set("strip_metadata", String(opts.strip_metadata));
+  form.set("sensor_noise", opts.sensor_noise ? String(ext.sensor_noise_level) : "0");
+  form.set("crop_pixels", opts.crop_zoom ? String(ext.crop_pixels) : "0");
+  form.set("zoom_factor", opts.crop_zoom ? ext.zoom_factor.toFixed(2) : "1.0");
+  form.set("hue_degrees", opts.color_adjust ? String(ext.hue_degrees) : "0");
+  form.set("color_grade", opts.color_adjust ? ext.color_grade : "none");
+  form.set("output_fps", opts.output_fps ? "29.97" : "source");
+  form.set("manual_caption", opts.manual_caption ? ext.manual_caption_text : "");
+  form.set("quality_crf", "18");
+
   const res = await fetchWithTimeout(
     `${API_URL}/api/video/process`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-      body: body.toString(),
-    },
+    { method: "POST", body: form, headers: { Accept: "application/json" } },
     180_000,
   );
   if (!res.ok) throw new Error(await parseError(res));
