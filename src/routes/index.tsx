@@ -1143,8 +1143,6 @@ function SideBySideCompare({
 }) {
   const originalRef = useRef<HTMLVideoElement>(null);
   const editedRef = useRef<HTMLVideoElement>(null);
-  const [syncPlay, setSyncPlay] = useState(true);
-  const [muted, setMuted] = useState(true);
 
   const playBoth = () => {
     originalRef.current?.play().catch(() => {});
