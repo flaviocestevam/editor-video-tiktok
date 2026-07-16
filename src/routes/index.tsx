@@ -481,13 +481,10 @@ function Index() {
               <Film className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold tracking-tight">Shorts Enhancer Studio</h1>
+              <h1 className="text-lg font-semibold tracking-tight">Editor Vídeos TikTok</h1>
               <p className="text-xs text-muted-foreground">Edição criativa para vídeos curtos</p>
             </div>
           </div>
-          <Badge variant="outline" className="hidden sm:inline-flex">
-            Beta
-          </Badge>
         </div>
       </header>
 
@@ -760,33 +757,18 @@ function Index() {
           </Card>
         </section>
 
-        {/* Preview */}
+        {/* Preview lado a lado (Original vs Editado) */}
         <section>
           <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-muted-foreground">
-            3. Preview
+            3. Comparar Original × Editado
           </h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            <PreviewCard
-              title="Original"
-              src={selected?.source === "upload" ? selected.originalUrl : undefined}
-              placeholder={
-                selected?.source === "link"
-                  ? "Preview do link fica indisponível — veja o resultado processado"
-                  : "Selecione um vídeo"
-              }
-            />
-            <PreviewCard
-              title="Editado"
-              src={selected?.editedUrl}
-              loading={selected?.status === "processing"}
-              placeholder={
-                selected?.status === "error"
-                  ? `Erro: ${selected.errorMessage}`
-                  : "Aguardando processamento"
-              }
-              accent
-            />
-          </div>
+          <SideBySideCompare
+            originalSrc={selected?.source === "upload" ? selected.originalUrl : undefined}
+            editedSrc={selected?.editedUrl}
+            editedLoading={selected?.status === "processing"}
+            errorMessage={selected?.status === "error" ? selected.errorMessage : undefined}
+            isLink={selected?.source === "link"}
+          />
         </section>
 
         {/* Export */}
@@ -927,42 +909,162 @@ function Index() {
   );
 }
 
-function PreviewCard({
-  title,
-  src,
-  placeholder,
-  accent,
-  loading,
+
+function SideBySideCompare({
+  originalSrc,
+  editedSrc,
+  editedLoading,
+  errorMessage,
+  isLink,
 }: {
-  title: string;
-  src?: string;
-  placeholder: string;
-  accent?: boolean;
-  loading?: boolean;
+  originalSrc?: string;
+  editedSrc?: string;
+  editedLoading?: boolean;
+  errorMessage?: string;
+  isLink?: boolean;
 }) {
+  const originalRef = useRef<HTMLVideoElement>(null);
+  const editedRef = useRef<HTMLVideoElement>(null);
+  const [syncPlay, setSyncPlay] = useState(true);
+  const [muted, setMuted] = useState(true);
+
+  const playBoth = () => {
+    originalRef.current?.play().catch(() => {});
+    editedRef.current?.play().catch(() => {});
+  };
+  const pauseBoth = () => {
+    originalRef.current?.pause();
+    editedRef.current?.pause();
+  };
+  const restartBoth = () => {
+    if (originalRef.current) originalRef.current.currentTime = 0;
+    if (editedRef.current) editedRef.current.currentTime = 0;
+    playBoth();
+  };
+
+  // sync from original -> edited (basic)
+  useEffect(() => {
+    if (!syncPlay) return;
+    const o = originalRef.current;
+    const e = editedRef.current;
+    if (!o || !e) return;
+    const onPlay = () => e.play().catch(() => {});
+    const onPause = () => e.pause();
+    const onSeek = () => {
+      e.currentTime = o.currentTime;
+    };
+    o.addEventListener("play", onPlay);
+    o.addEventListener("pause", onPause);
+    o.addEventListener("seeked", onSeek);
+    return () => {
+      o.removeEventListener("play", onPlay);
+      o.removeEventListener("pause", onPause);
+      o.removeEventListener("seeked", onSeek);
+    };
+  }, [syncPlay, originalSrc, editedSrc]);
+
+  const canCompare = !!originalSrc && !!editedSrc;
+
   return (
-    <Card
-      className={`overflow-hidden border-border/60 bg-card/50 ${
-        accent ? "ring-1 ring-fuchsia-500/30" : ""
-      }`}
-    >
-      <div className="flex items-center justify-between border-b border-border/60 px-4 py-2">
-        <span className="text-sm font-medium">{title}</span>
-        {accent && (
-          <Badge className="bg-fuchsia-500/20 text-fuchsia-300 hover:bg-fuchsia-500/20">novo</Badge>
-        )}
+    <Card className="border-border/60 bg-card/50 p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs text-muted-foreground">
+          {canCompare
+            ? "Reproduza os dois vídeos ao mesmo tempo para ver as diferenças (flip, cor, velocidade, crop)."
+            : isLink && editedSrc
+              ? "Original do link não pode ser exibido no navegador — veja apenas o resultado editado."
+              : "Selecione um vídeo processado para comparar."}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={syncPlay}
+              onChange={(e) => setSyncPlay(e.target.checked)}
+              className="h-3.5 w-3.5 accent-fuchsia-500"
+            />
+            Sincronizar
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={muted}
+              onChange={(e) => setMuted(e.target.checked)}
+              className="h-3.5 w-3.5 accent-fuchsia-500"
+            />
+            Mudo
+          </label>
+          <Button size="sm" variant="secondary" onClick={playBoth} disabled={!canCompare}>
+            ▶ Play
+          </Button>
+          <Button size="sm" variant="secondary" onClick={pauseBoth} disabled={!canCompare}>
+            ⏸ Pause
+          </Button>
+          <Button size="sm" variant="secondary" onClick={restartBoth} disabled={!canCompare}>
+            ↺ Reiniciar
+          </Button>
+        </div>
       </div>
-      <div className="flex aspect-[9/16] max-h-[420px] w-full items-center justify-center bg-black/60">
-        {loading ? (
-          <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-6 w-6 animate-spin text-fuchsia-400" />
-            Processando…
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="overflow-hidden rounded-md border border-border/50">
+          <div className="flex items-center justify-between border-b border-border/50 bg-background/40 px-3 py-1.5">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Original
+            </span>
           </div>
-        ) : src ? (
-          <video src={src} controls className="h-full w-full object-contain" />
-        ) : (
-          <span className="px-4 text-center text-sm text-muted-foreground">{placeholder}</span>
-        )}
+          <div className="flex aspect-[9/16] max-h-[460px] w-full items-center justify-center bg-black">
+            {originalSrc ? (
+              <video
+                ref={originalRef}
+                src={originalSrc}
+                controls
+                muted={muted}
+                playsInline
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <span className="px-4 text-center text-xs text-muted-foreground">
+                {isLink
+                  ? "Preview do original indisponível para links externos"
+                  : "Nenhum vídeo selecionado"}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-md border border-fuchsia-500/40 ring-1 ring-fuchsia-500/20">
+          <div className="flex items-center justify-between border-b border-fuchsia-500/30 bg-fuchsia-500/5 px-3 py-1.5">
+            <span className="text-xs font-medium uppercase tracking-wider text-fuchsia-300">
+              Editado
+            </span>
+            <Badge className="bg-fuchsia-500/20 text-fuchsia-300 hover:bg-fuchsia-500/20">
+              novo
+            </Badge>
+          </div>
+          <div className="flex aspect-[9/16] max-h-[460px] w-full items-center justify-center bg-black">
+            {editedLoading ? (
+              <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin text-fuchsia-400" />
+                Processando…
+              </div>
+            ) : editedSrc ? (
+              <video
+                ref={editedRef}
+                src={editedSrc}
+                controls
+                muted={muted}
+                playsInline
+                crossOrigin="anonymous"
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <span className="px-4 text-center text-xs text-muted-foreground">
+                {errorMessage ? `Erro: ${errorMessage}` : "Aguardando processamento"}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
     </Card>
   );
