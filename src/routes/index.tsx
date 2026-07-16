@@ -213,6 +213,7 @@ async function fetchWithTimeout(
       throw new Error(
         `Falha de rede ao acessar ${url}. Verifique sua conexão, se o backend está online e se o CORS está liberado.`,
       );
+    }
     throw err;
   } finally {
     clearTimeout(timer);
