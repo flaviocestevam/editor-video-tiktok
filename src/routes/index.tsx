@@ -287,10 +287,7 @@ function Index() {
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [edits, setEdits] = useState<EditOptions>(DEFAULT_EDITS);
-  const [ext, setExt] = useState<ExtOptions>(DEFAULT_EXT);
   const setEdit = (k: keyof EditOptions, v: boolean) => setEdits((e) => ({ ...e, [k]: v }));
-  const setExtField = <K extends keyof ExtOptions>(k: K, v: ExtOptions[K]) =>
-    setExt((e) => ({ ...e, [k]: v }));
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const detectedPlatform = useMemo(
