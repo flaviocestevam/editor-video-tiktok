@@ -260,7 +260,11 @@ function Index() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(HISTORY_KEY);
-      if (raw) setHistory(JSON.parse(raw));
+      if (raw) {
+        const normalized = (JSON.parse(raw) as HistoryItem[]).map(normalizeHistoryItem);
+        setHistory(normalized);
+        persistHistory(normalized);
+      }
     } catch {
       /* ignore */
     }
@@ -792,16 +796,26 @@ function Index() {
                   <div className="relative aspect-[9/16] max-h-56 w-full bg-black/60">
                     {h.editedUrl ? (
                       <video
-                        src={`${h.editedUrl}#t=0.5`}
+                        src={timedVideoUrl(h.editedUrl)}
                         className="h-full w-full object-contain"
                         preload="auto"
                         muted
                         playsInline
                         crossOrigin="anonymous"
+                        poster={timedVideoUrl(h.editedUrl, 1.25)}
                         onLoadedMetadata={(e) => {
                           const v = e.currentTarget;
                           try {
-                            if (v.currentTime === 0) v.currentTime = 0.1;
+                            v.currentTime = Math.min(1.25, Math.max(0.1, v.duration / 4 || 0.1));
+                            v.load();
+                          } catch {
+                            /* ignore */
+                          }
+                        }}
+                        onCanPlay={(e) => {
+                          const v = e.currentTarget;
+                          try {
+                            v.pause();
                           } catch {
                             /* ignore */
                           }
