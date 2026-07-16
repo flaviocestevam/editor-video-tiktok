@@ -68,6 +68,10 @@ type HistoryItem = {
 
 const HISTORY_KEY = "shorts-enhancer:history";
 
+function stripHash(url: string): string {
+  return url.split("#")[0];
+}
+
 function detectPlatform(url: string): Platform {
   const u = url.toLowerCase();
   if (u.includes("tiktok.com")) return "TikTok";
@@ -79,8 +83,21 @@ function detectPlatform(url: string): Platform {
 
 function absoluteUrl(pathOrUrl: string): string {
   if (!pathOrUrl) return pathOrUrl;
-  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
-  return `${API_URL}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
+  const cleanUrl = stripHash(pathOrUrl);
+  if (/^https?:\/\//i.test(cleanUrl)) return cleanUrl;
+  return `${API_URL}${cleanUrl.startsWith("/") ? "" : "/"}${cleanUrl}`;
+}
+
+function timedVideoUrl(url: string, seconds = 1.25): string {
+  return `${absoluteUrl(url)}#t=${seconds}`;
+}
+
+function normalizeHistoryItem(item: HistoryItem): HistoryItem {
+  return {
+    ...item,
+    editedUrl: item.editedUrl ? absoluteUrl(item.editedUrl) : undefined,
+    downloadUrl: item.downloadUrl ? absoluteUrl(item.downloadUrl) : undefined,
+  };
 }
 
 type ApiPayload = Record<string, unknown>;
