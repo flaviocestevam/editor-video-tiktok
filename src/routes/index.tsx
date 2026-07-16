@@ -187,14 +187,30 @@ async function fetchWithTimeout(
   }
 }
 
-async function callProcess(
-  fileId: string,
-  opts: { muteAudio: boolean; addIntroOutro: boolean },
-): Promise<unknown> {
+type EditOptions = {
+  remove_audio: boolean;
+  flip_horizontal: boolean;
+  random_trim: boolean;
+  crop_zoom: boolean;
+  speed_change: boolean;
+  color_adjust: boolean;
+  fade: boolean;
+};
+
+const DEFAULT_EDITS: EditOptions = {
+  remove_audio: false,
+  flip_horizontal: true,
+  random_trim: true,
+  crop_zoom: true,
+  speed_change: true,
+  color_adjust: true,
+  fade: true,
+};
+
+async function callProcess(fileId: string, opts: EditOptions): Promise<unknown> {
   const body = new URLSearchParams();
   body.set("file_id", fileId);
-  body.set("remove_audio", String(opts.muteAudio));
-  body.set("fade", String(opts.addIntroOutro));
+  (Object.keys(opts) as (keyof EditOptions)[]).forEach((k) => body.set(k, String(opts[k])));
   const res = await fetchWithTimeout(
     `${API_URL}/api/video/process`,
     {
