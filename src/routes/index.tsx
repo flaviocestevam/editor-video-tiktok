@@ -943,9 +943,40 @@ function Index() {
           Backend: {API_URL || "não configurado"}
         </footer>
       </main>
+
+      <Dialog open={!!playingItem} onOpenChange={(o) => !o && setPlayingId(null)}>
+        <DialogContent className="max-w-md border-border/60 bg-card">
+          <DialogHeader>
+            <DialogTitle className="truncate text-sm">{playingItem?.name}</DialogTitle>
+          </DialogHeader>
+          {playingItem?.editedUrl && (
+            <div className="flex aspect-[9/16] max-h-[70vh] w-full items-center justify-center overflow-hidden rounded-md bg-black">
+              <video
+                key={playingItem.id}
+                src={playingItem.editedUrl}
+                controls
+                autoPlay
+                playsInline
+                className="h-full w-full object-contain"
+              />
+            </div>
+          )}
+          {playingItem?.downloadUrl && (
+            <Button asChild size="sm" className="mt-2">
+              <a href={playingItem.downloadUrl} download={playingItem.name} target="_blank" rel="noopener">
+                <Download className="mr-1.5 h-3.5 w-3.5" /> Baixar este vídeo
+              </a>
+            </Button>
+          )}
+          <p className="mt-1 text-center text-[10px] text-muted-foreground">
+            Se o player não abrir, use "Baixar" — alguns MP4s antigos do backend não são reproduzidos direto no navegador.
+          </p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 
 function HistoryThumbnail({
