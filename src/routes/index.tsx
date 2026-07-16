@@ -979,7 +979,10 @@ function HistoryThumbnail({
       return;
     }
     if (frame === undefined) {
-      setPreviewFailed(false);
+      if (seekTimesRef.current.length === 0) seekTimesRef.current = thumbnailTimes(video);
+      if (seekIndexRef.current < Math.min(2, seekTimesRef.current.length)) {
+        seekNextFrame(video);
+      }
       return;
     }
     seekNextFrame(video);
@@ -994,7 +997,6 @@ function HistoryThumbnail({
         preload="auto"
         muted
         playsInline
-        crossOrigin="anonymous"
         onLoadedMetadata={(e) => seekNextFrame(e.currentTarget)}
         onLoadedData={(e) => handleFrameReady(e.currentTarget)}
         onSeeked={(e) => handleFrameReady(e.currentTarget)}
