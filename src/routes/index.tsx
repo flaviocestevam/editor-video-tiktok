@@ -712,159 +712,32 @@ function Index() {
                   { key: "strip_metadata", icon: ShieldOff, label: "Remover metadados", hint: "Remove informações técnicas do arquivo" },
                   { key: "sensor_noise", icon: Aperture, label: "Ruído de sensor", hint: "Adiciona grão visual muito sutil" },
                   { key: "output_fps", icon: Timer, label: "29,97 FPS", hint: "Padroniza a taxa de quadros" },
-                  { key: "manual_caption", icon: Type, label: "Legenda manual", hint: "Escreva um texto para aparecer no vídeo" },
                 ] as { key: keyof EditOptions; icon: typeof Sparkles; label: string; hint: string }[]
-              ).map((f) => {
-                const hasExpansion =
-                  f.key === "crop_zoom" ||
-                  f.key === "color_adjust" ||
-                  f.key === "sensor_noise" ||
-                  f.key === "manual_caption";
-                const expanded = hasExpansion && edits[f.key];
-                return (
-                  <div
-                    key={f.key}
-                    className={`rounded-md border px-3 py-2 text-sm transition-colors ${
-                      edits[f.key]
-                        ? "border-fuchsia-500/40 bg-fuchsia-500/5"
-                        : "border-border/50 bg-background/40 opacity-70"
-                    } ${expanded ? "sm:col-span-2 lg:col-span-3" : ""}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <Label htmlFor={`edit-${f.key}`} className="flex flex-1 items-center gap-2 cursor-pointer">
-                        <f.icon className={`h-4 w-4 ${edits[f.key] ? "text-fuchsia-400" : "text-muted-foreground"}`} />
-                        <span className="flex flex-col">
-                          <span className="leading-tight">{f.label}</span>
-                          <span className="text-[10px] text-muted-foreground">{f.hint}</span>
-                        </span>
-                      </Label>
-                      <Switch
-                        id={`edit-${f.key}`}
-                        checked={edits[f.key]}
-                        onCheckedChange={(v) => setEdit(f.key, v)}
-                      />
-                    </div>
-
-                    {expanded && f.key === "crop_zoom" && (
-                      <div className="mt-3 grid gap-4 border-t border-border/40 pt-3 sm:grid-cols-2">
-                        <div>
-                          <div className="mb-2 flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground">Recorte das bordas</span>
-                            <span className="tabular-nums font-medium text-fuchsia-300">
-                              {ext.crop_pixels}px
-                            </span>
-                          </div>
-                          <Slider
-                            min={0}
-                            max={8}
-                            step={1}
-                            value={[ext.crop_pixels]}
-                            onValueChange={([v]) => setExtField("crop_pixels", v)}
-                          />
-                        </div>
-                        <div>
-                          <div className="mb-2 flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground">Zoom</span>
-                            <span className="tabular-nums font-medium text-fuchsia-300">
-                              {ext.zoom_factor.toFixed(2)}x
-                            </span>
-                          </div>
-                          <Slider
-                            min={1.0}
-                            max={1.05}
-                            step={0.01}
-                            value={[ext.zoom_factor]}
-                            onValueChange={([v]) => setExtField("zoom_factor", Number(v.toFixed(2)))}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {expanded && f.key === "color_adjust" && (
-                      <div className="mt-3 grid gap-4 border-t border-border/40 pt-3 sm:grid-cols-2">
-                        <div>
-                          <div className="mb-2 flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground">Matiz</span>
-                            <span className="tabular-nums font-medium text-fuchsia-300">
-                              {ext.hue_degrees > 0 ? `+${ext.hue_degrees}` : ext.hue_degrees}°
-                            </span>
-                          </div>
-                          <Slider
-                            min={-3}
-                            max={3}
-                            step={1}
-                            value={[ext.hue_degrees]}
-                            onValueChange={([v]) => setExtField("hue_degrees", v)}
-                          />
-                        </div>
-                        <div>
-                          <div className="mb-2 text-xs text-muted-foreground">Preset</div>
-                          <Select
-                            value={ext.color_grade}
-                            onValueChange={(v) => setExtField("color_grade", v as ColorGrade)}
-                          >
-                            <SelectTrigger className="h-9">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Nenhum</SelectItem>
-                              <SelectItem value="warm">Quente</SelectItem>
-                              <SelectItem value="cool">Frio</SelectItem>
-                              <SelectItem value="cinematic">Cinematográfico</SelectItem>
-                              <SelectItem value="vintage">Vintage</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    )}
-
-                    {expanded && f.key === "sensor_noise" && (
-                      <div className="mt-3 border-t border-border/40 pt-3">
-                        <div className="mb-2 flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Intensidade</span>
-                          <span className="tabular-nums font-medium text-fuchsia-300">
-                            {ext.sensor_noise_level}
-                          </span>
-                        </div>
-                        <Slider
-                          min={1}
-                          max={4}
-                          step={1}
-                          value={[ext.sensor_noise_level]}
-                          onValueChange={([v]) => setExtField("sensor_noise_level", v)}
-                        />
-                      </div>
-                    )}
-
-                    {expanded && f.key === "manual_caption" && (
-                      <div className="mt-3 border-t border-border/40 pt-3">
-                        <Textarea
-                          value={ext.manual_caption_text}
-                          maxLength={500}
-                          onChange={(e) =>
-                            setExtField("manual_caption_text", e.target.value.slice(0, 500))
-                          }
-                          placeholder="Escreva o texto que aparecerá no vídeo…"
-                          className="min-h-[80px] resize-y"
-                        />
-                        <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                          <span className="tabular-nums">
-                            {ext.manual_caption_text.length}/500
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setExtField("manual_caption_text", "")}
-                            disabled={!ext.manual_caption_text}
-                            className="flex items-center gap-1 rounded px-2 py-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-                          >
-                            <X className="h-3 w-3" /> Limpar
-                          </button>
-                        </div>
-                      </div>
-                    )}
+              ).map((f) => (
+                <div
+                  key={f.key}
+                  className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                    edits[f.key]
+                      ? "border-fuchsia-500/40 bg-fuchsia-500/5"
+                      : "border-border/50 bg-background/40 opacity-70"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor={`edit-${f.key}`} className="flex flex-1 items-center gap-2 cursor-pointer">
+                      <f.icon className={`h-4 w-4 ${edits[f.key] ? "text-fuchsia-400" : "text-muted-foreground"}`} />
+                      <span className="flex flex-col">
+                        <span className="leading-tight">{f.label}</span>
+                        <span className="text-[10px] text-muted-foreground">{f.hint}</span>
+                      </span>
+                    </Label>
+                    <Switch
+                      id={`edit-${f.key}`}
+                      checked={edits[f.key]}
+                      onCheckedChange={(v) => setEdit(f.key, v)}
+                    />
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
             <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
               <span>
@@ -873,10 +746,7 @@ function Index() {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setEdits(DEFAULT_EDITS);
-                    setExt(DEFAULT_EXT);
-                  }}
+                  onClick={() => setEdits(DEFAULT_EDITS)}
                   className="text-fuchsia-400 hover:underline"
                 >
                   Padrão
@@ -895,7 +765,6 @@ function Index() {
                       strip_metadata: true,
                       sensor_noise: true,
                       output_fps: true,
-                      manual_caption: true,
                     })
                   }
                   className="text-indigo-400 hover:underline"
@@ -904,6 +773,7 @@ function Index() {
                 </button>
               </div>
             </div>
+
 
 
 
