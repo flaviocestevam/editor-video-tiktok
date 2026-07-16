@@ -228,8 +228,8 @@ function Index() {
   const [link, setLink] = useState("");
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [muteAudio, setMuteAudio] = useState(false);
-  const [addIntroOutro, setAddIntroOutro] = useState(true);
+  const [edits, setEdits] = useState<EditOptions>(DEFAULT_EDITS);
+  const setEdit = (k: keyof EditOptions, v: boolean) => setEdits((e) => ({ ...e, [k]: v }));
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const detectedPlatform = useMemo(
