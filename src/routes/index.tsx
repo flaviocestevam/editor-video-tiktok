@@ -481,13 +481,10 @@ function Index() {
               <Film className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold tracking-tight">Shorts Enhancer Studio</h1>
+              <h1 className="text-lg font-semibold tracking-tight">Editor Vídeos TikTok</h1>
               <p className="text-xs text-muted-foreground">Edição criativa para vídeos curtos</p>
             </div>
           </div>
-          <Badge variant="outline" className="hidden sm:inline-flex">
-            Beta
-          </Badge>
         </div>
       </header>
 
