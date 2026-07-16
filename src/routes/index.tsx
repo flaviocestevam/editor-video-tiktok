@@ -83,19 +83,30 @@ function absoluteUrl(pathOrUrl: string): string {
   return `${API_URL}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
 }
 
-function extractProcessedUrl(data: any): { editedUrl?: string; downloadUrl?: string } {
+type ApiPayload = Record<string, unknown>;
+
+function stringField(data: ApiPayload, key: string): string | undefined {
+  return typeof data[key] === "string" ? data[key] : undefined;
+}
+
+function extractProcessedUrl(data: unknown): { editedUrl?: string; downloadUrl?: string } {
   if (!data || typeof data !== "object") return {};
+  const payload = data as ApiPayload;
   const filename =
-    data.processed_filename || data.output_filename || data.result_filename || data.filename;
+    stringField(payload, "processed_filename") ||
+    stringField(payload, "output_filename") ||
+    stringField(payload, "result_filename") ||
+    stringField(payload, "filename");
   let edited: string | undefined =
-    data.processed_url ||
-    data.output_url ||
-    data.video_url ||
-    data.url ||
-    data.edited_url ||
-    data.result_url;
+    stringField(payload, "processed_url") ||
+    stringField(payload, "output_url") ||
+    stringField(payload, "video_url") ||
+    stringField(payload, "url") ||
+    stringField(payload, "edited_url") ||
+    stringField(payload, "result_url");
   if (!edited && filename) edited = `/api/video/result/${filename}`;
-  const download = data.download_url || data.file_url || edited;
+  const download =
+    stringField(payload, "download_url") || stringField(payload, "file_url") || edited;
   return {
     editedUrl: edited ? absoluteUrl(edited) : undefined,
     downloadUrl: download ? absoluteUrl(download) : undefined,
@@ -107,7 +118,14 @@ async function parseError(res: Response): Promise<string> {
   try {
     const j = JSON.parse(text);
     if (typeof j?.detail === "string") return j.detail;
-    if (Array.isArray(j?.detail)) return j.detail.map((d: any) => d.msg).join("; ");
+    if (Array.isArray(j?.detail))
+      return j.detail
+        .map((detail: unknown) =>
+          detail && typeof detail === "object" && "msg" in detail
+            ? String((detail as { msg: unknown }).msg)
+            : String(detail),
+        )
+        .join("; ");
     if (typeof j?.message === "string") return j.message;
     if (typeof j?.error === "string") return j.error;
   } catch {
@@ -130,9 +148,11 @@ async function fetchWithTimeout(
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
-  } catch (err: any) {
-    if (err?.name === "AbortError") {
-      throw new Error(`Tempo esgotado após ${Math.round(timeoutMs / 1000)}s. O servidor demorou demais para responder.`);
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(
+        `Tempo esgotado após ${Math.round(timeoutMs / 1000)}s. O servidor demorou demais para responder.`,
+      );
     }
     if (err instanceof TypeError && /fetch/i.test(err.message)) {
       throw new Error(
@@ -148,7 +168,7 @@ async function fetchWithTimeout(
 async function callProcess(
   fileId: string,
   opts: { muteAudio: boolean; addIntroOutro: boolean },
-): Promise<any> {
+): Promise<unknown> {
   const body = new URLSearchParams();
   body.set("file_id", fileId);
   body.set("remove_audio", String(opts.muteAudio));
@@ -286,8 +306,8 @@ function Index() {
       updateVideo(item.id, { status: "done", editedUrl, downloadUrl });
       addToHistory(done);
       toast.success(`"${item.name}" processado com sucesso!`);
-    } catch (err: any) {
-      const msg = err?.message ?? "Falha";
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha";
       updateVideo(item.id, { status: "error", errorMessage: msg });
       toast.error(`Erro ao processar: ${msg}`);
     }
@@ -324,8 +344,8 @@ function Index() {
       updateVideo(item.id, { status: "done", editedUrl, downloadUrl });
       addToHistory(done);
       toast.success(`Vídeo processado com sucesso!`);
-    } catch (err: any) {
-      const msg = err?.message ?? "Falha";
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha";
       updateVideo(item.id, { status: "error", errorMessage: msg });
       toast.error(`Erro ao processar: ${msg}`);
     }
@@ -608,7 +628,10 @@ function Index() {
               <div className="mt-6">
                 <Button
                   onClick={startAll}
-                  disabled={anyProcessing || !videos.some((v) => v.status === "idle" || v.status === "error")}
+                  disabled={
+                    anyProcessing ||
+                    !videos.some((v) => v.status === "idle" || v.status === "error")
+                  }
                   className="h-14 w-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-base font-semibold shadow-lg shadow-fuchsia-500/20 hover:from-fuchsia-500/90 hover:to-indigo-500/90"
                 >
                   {anyProcessing ? (
@@ -618,9 +641,9 @@ function Index() {
                     </>
                   ) : (
                     <>
-                      <Play className="mr-2 h-5 w-5 fill-current" />
-                      ▶ Iniciar Edições Automáticas
-                      {videos.filter((v) => v.status === "idle" || v.status === "error").length > 1 &&
+                      <Play className="mr-2 h-5 w-5 fill-current" />▶ Iniciar Edições Automáticas
+                      {videos.filter((v) => v.status === "idle" || v.status === "error").length >
+                        1 &&
                         ` (${videos.filter((v) => v.status === "idle" || v.status === "error").length})`}
                     </>
                   )}
@@ -705,7 +728,12 @@ function Index() {
             <div className="flex gap-2">
               {selected?.downloadUrl && (
                 <Button asChild variant="secondary" size="lg" className="h-11">
-                  <a href={selected.downloadUrl} download={selected.name} target="_blank" rel="noopener">
+                  <a
+                    href={selected.downloadUrl}
+                    download={selected.name}
+                    target="_blank"
+                    rel="noopener"
+                  >
                     <Download className="mr-2 h-4 w-4" />
                     Baixar selecionado
                   </a>
@@ -746,7 +774,12 @@ function Index() {
                 <Card key={h.id} className="overflow-hidden border-border/60 bg-card/50">
                   <div className="relative aspect-[9/16] max-h-56 w-full bg-black/60">
                     {h.editedUrl ? (
-                      <video src={h.editedUrl} className="h-full w-full object-contain" preload="metadata" muted />
+                      <video
+                        src={h.editedUrl}
+                        className="h-full w-full object-contain"
+                        preload="metadata"
+                        muted
+                      />
                     ) : (
                       <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
                         Sem preview
@@ -792,7 +825,6 @@ function Index() {
             </div>
           )}
         </section>
-
 
         <footer className="pb-6 pt-4 text-center text-xs text-muted-foreground">
           Backend: {API_URL || "não configurado"}
