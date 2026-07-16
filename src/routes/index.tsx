@@ -920,6 +920,95 @@ function Index() {
 }
 
 
+function HistoryThumbnail({
+  item,
+  onThumbnail,
+}: {
+  item: HistoryItem;
+  onThumbnail: (thumbnailUrl: string) => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const seekTimesRef = useRef<number[]>([]);
+  const seekIndexRef = useRef(0);
+  const [previewFailed, setPreviewFailed] = useState(false);
+
+  useEffect(() => {
+    seekTimesRef.current = [];
+    seekIndexRef.current = 0;
+    setPreviewFailed(false);
+  }, [item.id, item.editedUrl, item.thumbnailUrl]);
+
+  if (!item.editedUrl) {
+    return (
+      <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+        Sem preview
+      </div>
+    );
+  }
+
+  if (item.thumbnailUrl) {
+    return (
+      <img
+        src={item.thumbnailUrl}
+        alt={`Miniatura de ${item.name}`}
+        className="h-full w-full object-contain"
+        loading="lazy"
+      />
+    );
+  }
+
+  const seekNextFrame = (video: HTMLVideoElement) => {
+    if (seekTimesRef.current.length === 0) seekTimesRef.current = thumbnailTimes(video);
+    const next = seekTimesRef.current[seekIndexRef.current];
+    if (next === undefined) {
+      setPreviewFailed(true);
+      return;
+    }
+    seekIndexRef.current += 1;
+    try {
+      video.currentTime = next;
+    } catch {
+      seekNextFrame(video);
+    }
+  };
+
+  const handleFrameReady = (video: HTMLVideoElement) => {
+    const frame = captureFrame(video);
+    if (frame) {
+      onThumbnail(frame);
+      return;
+    }
+    if (frame === undefined) {
+      setPreviewFailed(false);
+      return;
+    }
+    seekNextFrame(video);
+  };
+
+  return (
+    <>
+      <video
+        ref={videoRef}
+        src={item.editedUrl}
+        className="h-full w-full object-contain"
+        preload="auto"
+        muted
+        playsInline
+        crossOrigin="anonymous"
+        onLoadedMetadata={(e) => seekNextFrame(e.currentTarget)}
+        onLoadedData={(e) => handleFrameReady(e.currentTarget)}
+        onSeeked={(e) => handleFrameReady(e.currentTarget)}
+        onError={() => setPreviewFailed(true)}
+      />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-2 pb-2 pt-6 text-[10px] text-white/80">
+        <span>{previewFailed ? "Preview indisponível" : "Gerando miniatura…"}</span>
+        <Play className="h-3.5 w-3.5" />
+      </div>
+    </>
+  );
+}
+
+
 function SideBySideCompare({
   originalSrc,
   editedSrc,
