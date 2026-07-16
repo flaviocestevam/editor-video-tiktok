@@ -757,33 +757,18 @@ function Index() {
           </Card>
         </section>
 
-        {/* Preview */}
+        {/* Preview lado a lado (Original vs Editado) */}
         <section>
           <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-muted-foreground">
-            3. Preview
+            3. Comparar Original × Editado
           </h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            <PreviewCard
-              title="Original"
-              src={selected?.source === "upload" ? selected.originalUrl : undefined}
-              placeholder={
-                selected?.source === "link"
-                  ? "Preview do link fica indisponível — veja o resultado processado"
-                  : "Selecione um vídeo"
-              }
-            />
-            <PreviewCard
-              title="Editado"
-              src={selected?.editedUrl}
-              loading={selected?.status === "processing"}
-              placeholder={
-                selected?.status === "error"
-                  ? `Erro: ${selected.errorMessage}`
-                  : "Aguardando processamento"
-              }
-              accent
-            />
-          </div>
+          <SideBySideCompare
+            originalSrc={selected?.source === "upload" ? selected.originalUrl : undefined}
+            editedSrc={selected?.editedUrl}
+            editedLoading={selected?.status === "processing"}
+            errorMessage={selected?.status === "error" ? selected.errorMessage : undefined}
+            isLink={selected?.source === "link"}
+          />
         </section>
 
         {/* Export */}
