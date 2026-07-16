@@ -1067,7 +1067,7 @@ function HistoryThumbnail({
         onError={() => setPreviewFailed(true)}
       />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-2 pb-2 pt-6 text-[10px] text-white/80">
-        <span>{previewFailed ? "Preview indisponível" : loadingBlob ? "Carregando prévia…" : "Prévia do vídeo"}</span>
+        <span>{loadingBlob ? "Carregando prévia…" : videoReady ? "Prévia do vídeo" : "Vídeo processado"}</span>
         <Play className="h-3.5 w-3.5" />
       </div>
     </>
