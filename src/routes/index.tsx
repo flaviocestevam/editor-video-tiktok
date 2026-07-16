@@ -988,22 +988,31 @@ function HistoryThumbnail({
     seekNextFrame(video);
   };
 
+  const handlePlayablePreview = (video: HTMLVideoElement) => {
+    handleFrameReady(video);
+    video.muted = true;
+    void video.play().catch(() => undefined);
+  };
+
   return (
     <>
       <video
         ref={videoRef}
-        src={item.editedUrl}
+        src={`${item.editedUrl}#t=2`}
         className="h-full w-full object-contain"
         preload="auto"
+        autoPlay
+        loop
         muted
         playsInline
         onLoadedMetadata={(e) => seekNextFrame(e.currentTarget)}
         onLoadedData={(e) => handleFrameReady(e.currentTarget)}
+        onCanPlay={(e) => handlePlayablePreview(e.currentTarget)}
         onSeeked={(e) => handleFrameReady(e.currentTarget)}
         onError={() => setPreviewFailed(true)}
       />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-2 pb-2 pt-6 text-[10px] text-white/80">
-        <span>{previewFailed ? "Preview indisponível" : "Gerando miniatura…"}</span>
+        <span>{previewFailed ? "Preview indisponível" : "Prévia do vídeo"}</span>
         <Play className="h-3.5 w-3.5" />
       </div>
     </>
