@@ -68,6 +68,10 @@ type HistoryItem = {
 
 const HISTORY_KEY = "shorts-enhancer:history";
 
+function stripHash(url: string): string {
+  return url.split("#")[0];
+}
+
 function detectPlatform(url: string): Platform {
   const u = url.toLowerCase();
   if (u.includes("tiktok.com")) return "TikTok";
@@ -79,8 +83,26 @@ function detectPlatform(url: string): Platform {
 
 function absoluteUrl(pathOrUrl: string): string {
   if (!pathOrUrl) return pathOrUrl;
-  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
-  return `${API_URL}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
+  const cleanUrl = stripHash(pathOrUrl);
+  if (/^https?:\/\//i.test(cleanUrl)) return cleanUrl;
+  return `${API_URL}${cleanUrl.startsWith("/") ? "" : "/"}${cleanUrl}`;
+}
+
+function timedVideoUrl(url: string, seconds = 1.25): string {
+  return `${absoluteUrl(url)}#t=${seconds}`;
+}
+
+function thumbnailSecond(video: HTMLVideoElement): number {
+  if (!Number.isFinite(video.duration) || video.duration <= 0) return 1.25;
+  return Math.min(Math.max(video.duration * 0.35, 1.25), 3);
+}
+
+function normalizeHistoryItem(item: HistoryItem): HistoryItem {
+  return {
+    ...item,
+    editedUrl: item.editedUrl ? absoluteUrl(item.editedUrl) : undefined,
+    downloadUrl: item.downloadUrl ? absoluteUrl(item.downloadUrl) : undefined,
+  };
 }
 
 type ApiPayload = Record<string, unknown>;
@@ -243,7 +265,11 @@ function Index() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(HISTORY_KEY);
-      if (raw) setHistory(JSON.parse(raw));
+      if (raw) {
+        const normalized = (JSON.parse(raw) as HistoryItem[]).map(normalizeHistoryItem);
+        setHistory(normalized);
+        persistHistory(normalized);
+      }
     } catch {
       /* ignore */
     }
@@ -775,16 +801,23 @@ function Index() {
                   <div className="relative aspect-[9/16] max-h-56 w-full bg-black/60">
                     {h.editedUrl ? (
                       <video
-                        src={`${h.editedUrl}#t=0.5`}
+                        src={timedVideoUrl(h.editedUrl)}
                         className="h-full w-full object-contain"
                         preload="auto"
                         muted
                         playsInline
-                        crossOrigin="anonymous"
                         onLoadedMetadata={(e) => {
                           const v = e.currentTarget;
                           try {
-                            if (v.currentTime === 0) v.currentTime = 0.1;
+                            v.currentTime = thumbnailSecond(v);
+                          } catch {
+                            /* ignore */
+                          }
+                        }}
+                        onCanPlay={(e) => {
+                          const v = e.currentTarget;
+                          try {
+                            void v.play().then(() => v.pause()).catch(() => undefined);
                           } catch {
                             /* ignore */
                           }
