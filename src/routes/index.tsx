@@ -231,6 +231,8 @@ type EditOptions = {
   strip_metadata: boolean;
   sensor_noise: boolean;
   output_fps: boolean;
+  smooth_motion: boolean;
+  adaptive_sharpen: boolean;
 };
 
 const DEFAULT_EDITS: EditOptions = {
@@ -244,9 +246,11 @@ const DEFAULT_EDITS: EditOptions = {
   strip_metadata: true,
   sensor_noise: true,
   output_fps: true,
+  smooth_motion: true,
+  adaptive_sharpen: true,
 };
 
-const TOTAL_EDITS = 10;
+const TOTAL_EDITS = 12;
 
 async function callProcess(fileId: string, opts: EditOptions): Promise<unknown> {
   const form = new FormData();
@@ -270,6 +274,8 @@ async function callProcess(fileId: string, opts: EditOptions): Promise<unknown> 
   form.set("hue_degrees", opts.color_adjust ? "1" : "0");
   form.set("color_grade", opts.color_adjust ? "cinematic" : "none");
   form.set("output_fps", opts.output_fps ? "29.97" : "source");
+  form.set("smooth_motion", String(opts.smooth_motion));
+  form.set("adaptive_sharpen", String(opts.adaptive_sharpen));
   form.set("quality_crf", "18");
 
 
@@ -709,9 +715,11 @@ function Index() {
                   { key: "color_adjust", icon: Palette, label: "Cor, brilho, contraste", hint: "Ajustes de saturação" },
                   { key: "fade", icon: Film, label: "Fade intro/outro", hint: "Fade in/out nas bordas" },
                   { key: "remove_audio", icon: Music2, label: "Remover áudio", hint: "Silencia trilha original" },
-                  { key: "strip_metadata", icon: ShieldOff, label: "Metadados iPhone", hint: "Aplica automaticamente iPhone 15 Pro Max, data atual e Rio de Janeiro" },
+                  { key: "strip_metadata", icon: ShieldOff, label: "Metadados iPhone", hint: "Aplica iPhone 15 Pro Max, data atual e Rio de Janeiro" },
                   { key: "sensor_noise", icon: Aperture, label: "Ruído de sensor", hint: "Adiciona grão visual muito sutil" },
                   { key: "output_fps", icon: Timer, label: "29,97 FPS", hint: "Padroniza a taxa de quadros" },
+                  { key: "smooth_motion", icon: Gauge, label: "Movimento suave", hint: "Aplica zoom progressivo e deslocamento leve" },
+                  { key: "adaptive_sharpen", icon: Sparkles, label: "Nitidez adaptativa", hint: "Recupera detalhes conforme a resolução" },
                 ] as { key: keyof EditOptions; icon: typeof Sparkles; label: string; hint: string }[]
               ).map((f) => (
                 <div
@@ -765,6 +773,8 @@ function Index() {
                       strip_metadata: true,
                       sensor_noise: true,
                       output_fps: true,
+                      smooth_motion: true,
+                      adaptive_sharpen: true,
                     })
                   }
                   className="text-indigo-400 hover:underline"
