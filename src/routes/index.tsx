@@ -884,6 +884,16 @@ function Index() {
                       {new Date(h.processedAt).toLocaleString("pt-BR")}
                     </div>
                     <div className="mt-3 flex gap-2">
+                      {h.editedUrl ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="flex-1"
+                          onClick={() => setPlayingId(h.id)}
+                        >
+                          <Play className="mr-1.5 h-3.5 w-3.5" /> Reproduzir
+                        </Button>
+                      ) : null}
                       {h.downloadUrl ? (
                         <Button asChild size="sm" className="flex-1">
                           <a href={h.downloadUrl} download={h.name} target="_blank" rel="noopener">
@@ -903,6 +913,7 @@ function Index() {
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
+
                     </div>
                   </div>
                 </Card>
