@@ -63,6 +63,7 @@ type HistoryItem = {
   source: "link" | "upload";
   editedUrl?: string;
   downloadUrl?: string;
+  thumbnailUrl?: string;
   processedAt: number;
 };
 
@@ -88,13 +89,39 @@ function absoluteUrl(pathOrUrl: string): string {
   return `${API_URL}${cleanUrl.startsWith("/") ? "" : "/"}${cleanUrl}`;
 }
 
-function timedVideoUrl(url: string, seconds = 1.25): string {
-  return `${absoluteUrl(url)}#t=${seconds}`;
+function thumbnailTimes(video: HTMLVideoElement): number[] {
+  const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 6;
+  return [0.42, 0.58, 0.28, 0.72, 0.86].map((ratio) =>
+    Math.min(Math.max(duration * ratio, 0.75), Math.max(duration - 0.35, 0.75)),
+  );
 }
 
-function thumbnailSecond(video: HTMLVideoElement): number {
-  if (!Number.isFinite(video.duration) || video.duration <= 0) return 1.25;
-  return Math.min(Math.max(video.duration * 0.35, 1.25), 3);
+function captureFrame(video: HTMLVideoElement): string | null | undefined {
+  if (!video.videoWidth || !video.videoHeight) return null;
+  const canvas = document.createElement("canvas");
+  const maxWidth = 360;
+  const scale = Math.min(1, maxWidth / video.videoWidth);
+  canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+  canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+
+  try {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let brightness = 0;
+    let samples = 0;
+    const step = Math.max(4, Math.floor(pixels.length / 900));
+    for (let i = 0; i < pixels.length; i += step * 4) {
+      brightness += pixels[i] * 0.2126 + pixels[i + 1] * 0.7152 + pixels[i + 2] * 0.0722;
+      samples += 1;
+    }
+    const averageBrightness = samples ? brightness / samples : 0;
+    if (averageBrightness < 18) return null;
+    return canvas.toDataURL("image/jpeg", 0.78);
+  } catch {
+    return undefined;
+  }
 }
 
 function normalizeHistoryItem(item: HistoryItem): HistoryItem {
@@ -102,6 +129,7 @@ function normalizeHistoryItem(item: HistoryItem): HistoryItem {
     ...item,
     editedUrl: item.editedUrl ? absoluteUrl(item.editedUrl) : undefined,
     downloadUrl: item.downloadUrl ? absoluteUrl(item.downloadUrl) : undefined,
+    thumbnailUrl: item.thumbnailUrl,
   };
 }
 
@@ -320,6 +348,13 @@ function Index() {
 
   const removeFromHistory = (id: string) => saveHistory(history.filter((h) => h.id !== id));
   const clearHistory = () => saveHistory([]);
+  const updateHistoryThumbnail = (id: string, thumbnailUrl: string) => {
+    setHistory((prev) => {
+      const next = prev.map((h) => (h.id === id ? { ...h, thumbnailUrl } : h));
+      persistHistory(next);
+      return next;
+    });
+  };
 
   const updateVideo = (id: string, patch: Partial<VideoItem>) =>
     setVideos((vs) => vs.map((v) => (v.id === id ? { ...v, ...patch } : v)));
@@ -831,35 +866,10 @@ function Index() {
               {history.map((h) => (
                 <Card key={h.id} className="overflow-hidden border-border/60 bg-card/50">
                   <div className="relative aspect-[9/16] max-h-56 w-full bg-black/60">
-                    {h.editedUrl ? (
-                      <video
-                        src={timedVideoUrl(h.editedUrl)}
-                        className="h-full w-full object-contain"
-                        preload="auto"
-                        muted
-                        playsInline
-                        onLoadedMetadata={(e) => {
-                          const v = e.currentTarget;
-                          try {
-                            v.currentTime = thumbnailSecond(v);
-                          } catch {
-                            /* ignore */
-                          }
-                        }}
-                        onCanPlay={(e) => {
-                          const v = e.currentTarget;
-                          try {
-                            void v.play().then(() => v.pause()).catch(() => undefined);
-                          } catch {
-                            /* ignore */
-                          }
-                        }}
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                        Sem preview
-                      </div>
-                    )}
+                    <HistoryThumbnail
+                      item={h}
+                      onThumbnail={(thumbnailUrl) => updateHistoryThumbnail(h.id, thumbnailUrl)}
+                    />
                     {h.platform && (
                       <Badge className="absolute left-2 top-2 h-5 bg-black/60 px-2 text-[10px]">
                         {h.platform}
@@ -906,6 +916,164 @@ function Index() {
         </footer>
       </main>
     </div>
+  );
+}
+
+
+function HistoryThumbnail({
+  item,
+  onThumbnail,
+}: {
+  item: HistoryItem;
+  onThumbnail: (thumbnailUrl: string) => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const seekTimesRef = useRef<number[]>([]);
+  const seekIndexRef = useRef(0);
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [loadingBlob, setLoadingBlob] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
+
+  useEffect(() => {
+    seekTimesRef.current = [];
+    seekIndexRef.current = 0;
+    setObjectUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+    setPreviewFailed(false);
+    setVideoReady(false);
+  }, [item.id, item.editedUrl, item.thumbnailUrl]);
+
+  useEffect(() => {
+    if (!item.editedUrl || item.thumbnailUrl) return;
+    let cancelled = false;
+    setLoadingBlob(true);
+    fetch(item.editedUrl)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        if (cancelled) return;
+        setObjectUrl((current) => {
+          if (current) URL.revokeObjectURL(current);
+          return URL.createObjectURL(blob);
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingBlob(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [item.editedUrl, item.thumbnailUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [objectUrl]);
+
+  if (!item.editedUrl) {
+    return (
+      <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+        Sem preview
+      </div>
+    );
+  }
+
+  if (item.thumbnailUrl) {
+    return (
+      <img
+        src={item.thumbnailUrl}
+        alt={`Miniatura de ${item.name}`}
+        className="h-full w-full object-contain"
+        loading="lazy"
+      />
+    );
+  }
+
+  const seekNextFrame = (video: HTMLVideoElement) => {
+    if (seekTimesRef.current.length === 0) seekTimesRef.current = thumbnailTimes(video);
+    const next = seekTimesRef.current[seekIndexRef.current];
+    if (next === undefined) {
+      setPreviewFailed(true);
+      return;
+    }
+    seekIndexRef.current += 1;
+    try {
+      video.currentTime = next;
+    } catch {
+      seekNextFrame(video);
+    }
+  };
+
+  const handleFrameReady = (video: HTMLVideoElement) => {
+    setVideoReady(true);
+    const frame = captureFrame(video);
+    if (frame) {
+      onThumbnail(frame);
+      return;
+    }
+    if (frame === undefined) {
+      if (seekTimesRef.current.length === 0) seekTimesRef.current = thumbnailTimes(video);
+      if (seekIndexRef.current < Math.min(2, seekTimesRef.current.length)) {
+        seekNextFrame(video);
+      }
+      return;
+    }
+    seekNextFrame(video);
+  };
+
+  const handlePlayablePreview = (video: HTMLVideoElement) => {
+    handleFrameReady(video);
+    video.muted = true;
+    void video.play().catch(() => undefined);
+  };
+
+  return (
+    <>
+      <div
+        className={`absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[radial-gradient(circle_at_30%_20%,hsl(var(--primary)/0.45),transparent_34%),linear-gradient(135deg,hsl(var(--card)),hsl(var(--secondary)))] px-4 text-center transition-opacity ${
+          videoReady && !previewFailed ? "opacity-0" : "opacity-100"
+        }`}
+      >
+        <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-white/10 shadow-lg">
+          <Film className="h-6 w-6 text-fuchsia-200" />
+        </div>
+        <div className="max-w-[85%] truncate text-xs font-medium text-foreground">{item.name}</div>
+        <div className="text-[10px] text-muted-foreground">
+          {loadingBlob ? "Carregando prévia…" : previewFailed ? "Vídeo pronto para baixar" : "Preparando miniatura…"}
+        </div>
+      </div>
+      {!previewFailed && (
+        <video
+          ref={videoRef}
+          src={objectUrl ? `${objectUrl}#t=2` : undefined}
+          className="absolute inset-0 h-full w-full object-contain transition-opacity"
+          style={{ opacity: videoReady ? 1 : 0 }}
+          preload="auto"
+          autoPlay
+          loop
+          muted
+          playsInline
+          onLoadedMetadata={(e) => seekNextFrame(e.currentTarget)}
+          onLoadedData={(e) => handleFrameReady(e.currentTarget)}
+          onCanPlay={(e) => handlePlayablePreview(e.currentTarget)}
+          onSeeked={(e) => handleFrameReady(e.currentTarget)}
+          onError={() => setPreviewFailed(true)}
+        />
+      )}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-2 pb-2 pt-6 text-[10px] text-white/80">
+        <span>{loadingBlob ? "Carregando prévia…" : videoReady ? "Prévia do vídeo" : "Vídeo processado"}</span>
+        <Play className="h-3.5 w-3.5" />
+      </div>
+    </>
   );
 }
 
