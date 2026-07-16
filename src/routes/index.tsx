@@ -927,57 +927,17 @@ function HistoryThumbnail({
   item: HistoryItem;
   onThumbnail: (thumbnailUrl: string) => void;
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
   const seekTimesRef = useRef<number[]>([]);
   const seekIndexRef = useRef(0);
-  const [objectUrl, setObjectUrl] = useState<string | null>(null);
-  const [loadingBlob, setLoadingBlob] = useState(false);
-  const [previewFailed, setPreviewFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
 
   useEffect(() => {
     seekTimesRef.current = [];
     seekIndexRef.current = 0;
-    setObjectUrl((current) => {
-      if (current) URL.revokeObjectURL(current);
-      return null;
-    });
-    setPreviewFailed(false);
     setVideoReady(false);
+    setPreviewFailed(false);
   }, [item.id, item.editedUrl, item.thumbnailUrl]);
-
-  useEffect(() => {
-    if (!item.editedUrl || item.thumbnailUrl) return;
-    let cancelled = false;
-    setLoadingBlob(true);
-    fetch(item.editedUrl)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.blob();
-      })
-      .then((blob) => {
-        if (cancelled) return;
-        setObjectUrl((current) => {
-          if (current) URL.revokeObjectURL(current);
-          return URL.createObjectURL(blob);
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setPreviewFailed(true);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingBlob(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [item.editedUrl, item.thumbnailUrl]);
-
-  useEffect(() => {
-    return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [objectUrl]);
 
   if (!item.editedUrl) {
     return (
@@ -1030,12 +990,6 @@ function HistoryThumbnail({
     seekNextFrame(video);
   };
 
-  const handlePlayablePreview = (video: HTMLVideoElement) => {
-    handleFrameReady(video);
-    video.muted = true;
-    void video.play().catch(() => undefined);
-  };
-
   return (
     <>
       <div
@@ -1048,34 +1002,31 @@ function HistoryThumbnail({
         </div>
         <div className="max-w-[85%] truncate text-xs font-medium text-foreground">{item.name}</div>
         <div className="text-[10px] text-muted-foreground">
-          {loadingBlob ? "Carregando prévia…" : previewFailed ? "Vídeo pronto para baixar" : "Preparando miniatura…"}
+          {previewFailed ? "Vídeo pronto para baixar" : "Prévia do vídeo processado"}
         </div>
       </div>
       {!previewFailed && (
         <video
-          ref={videoRef}
-          src={objectUrl ? `${objectUrl}#t=2` : undefined}
+          src={`${item.editedUrl}#t=1.2`}
           className="absolute inset-0 h-full w-full object-contain transition-opacity"
           style={{ opacity: videoReady ? 1 : 0 }}
-          preload="auto"
-          autoPlay
-          loop
+          preload="metadata"
           muted
           playsInline
           onLoadedMetadata={(e) => seekNextFrame(e.currentTarget)}
           onLoadedData={(e) => handleFrameReady(e.currentTarget)}
-          onCanPlay={(e) => handlePlayablePreview(e.currentTarget)}
           onSeeked={(e) => handleFrameReady(e.currentTarget)}
           onError={() => setPreviewFailed(true)}
         />
       )}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-2 pb-2 pt-6 text-[10px] text-white/80">
-        <span>{loadingBlob ? "Carregando prévia…" : videoReady ? "Prévia do vídeo" : "Vídeo processado"}</span>
+        <span>{videoReady ? "Prévia do vídeo" : "Vídeo processado"}</span>
         <Play className="h-3.5 w-3.5" />
       </div>
     </>
   );
 }
+
 
 
 function SideBySideCompare({
