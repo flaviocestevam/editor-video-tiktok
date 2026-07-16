@@ -1051,21 +1051,24 @@ function HistoryThumbnail({
           {loadingBlob ? "Carregando prévia…" : previewFailed ? "Vídeo pronto para baixar" : "Preparando miniatura…"}
         </div>
       </div>
-      <video
-        ref={videoRef}
-        src={objectUrl ? `${objectUrl}#t=2` : undefined}
-        className={`h-full w-full object-contain transition-opacity ${videoReady && !previewFailed ? "opacity-100" : "opacity-0"}`}
-        preload="auto"
-        autoPlay
-        loop
-        muted
-        playsInline
-        onLoadedMetadata={(e) => seekNextFrame(e.currentTarget)}
-        onLoadedData={(e) => handleFrameReady(e.currentTarget)}
-        onCanPlay={(e) => handlePlayablePreview(e.currentTarget)}
-        onSeeked={(e) => handleFrameReady(e.currentTarget)}
-        onError={() => setPreviewFailed(true)}
-      />
+      {!previewFailed && (
+        <video
+          ref={videoRef}
+          src={objectUrl ? `${objectUrl}#t=2` : undefined}
+          className="absolute inset-0 h-full w-full object-contain transition-opacity"
+          style={{ opacity: videoReady ? 1 : 0 }}
+          preload="auto"
+          autoPlay
+          loop
+          muted
+          playsInline
+          onLoadedMetadata={(e) => seekNextFrame(e.currentTarget)}
+          onLoadedData={(e) => handleFrameReady(e.currentTarget)}
+          onCanPlay={(e) => handlePlayablePreview(e.currentTarget)}
+          onSeeked={(e) => handleFrameReady(e.currentTarget)}
+          onError={() => setPreviewFailed(true)}
+        />
+      )}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-2 pb-2 pt-6 text-[10px] text-white/80">
         <span>{loadingBlob ? "Carregando prévia…" : videoReady ? "Prévia do vídeo" : "Vídeo processado"}</span>
         <Play className="h-3.5 w-3.5" />
