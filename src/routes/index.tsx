@@ -1201,7 +1201,6 @@ function SideBySideCompare({
               onChange={(e) => setSyncPlay(e.target.checked)}
               className="h-3.5 w-3.5 accent-fuchsia-500"
             />
-            Sincronizar
           </label>
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <input
@@ -1210,7 +1209,7 @@ function SideBySideCompare({
               onChange={(e) => setMuted(e.target.checked)}
               className="h-3.5 w-3.5 accent-fuchsia-500"
             />
-            Mudo
+            {"\n"}
           </label>
           <Button size="sm" variant="secondary" onClick={playBoth} disabled={!canCompare}>
             ▶ Play
