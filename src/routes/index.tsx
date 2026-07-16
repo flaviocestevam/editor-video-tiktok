@@ -92,6 +92,11 @@ function timedVideoUrl(url: string, seconds = 1.25): string {
   return `${absoluteUrl(url)}#t=${seconds}`;
 }
 
+function thumbnailSecond(video: HTMLVideoElement): number {
+  if (!Number.isFinite(video.duration) || video.duration <= 0) return 1.25;
+  return Math.min(Math.max(video.duration * 0.35, 1.25), 3);
+}
+
 function normalizeHistoryItem(item: HistoryItem): HistoryItem {
   return {
     ...item,
@@ -801,13 +806,10 @@ function Index() {
                         preload="auto"
                         muted
                         playsInline
-                        crossOrigin="anonymous"
-                        poster={timedVideoUrl(h.editedUrl, 1.25)}
                         onLoadedMetadata={(e) => {
                           const v = e.currentTarget;
                           try {
-                            v.currentTime = Math.min(1.25, Math.max(0.1, v.duration / 4 || 0.1));
-                            v.load();
+                            v.currentTime = thumbnailSecond(v);
                           } catch {
                             /* ignore */
                           }
@@ -815,7 +817,7 @@ function Index() {
                         onCanPlay={(e) => {
                           const v = e.currentTarget;
                           try {
-                            v.pause();
+                            void v.play().then(() => v.pause()).catch(() => undefined);
                           } catch {
                             /* ignore */
                           }
