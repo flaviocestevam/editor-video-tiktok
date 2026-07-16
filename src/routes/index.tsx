@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 
 import { toast, Toaster } from "sonner";
 
@@ -306,6 +308,9 @@ function Index() {
   }, [anyProcessing]);
 
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const playingItem = history.find((h) => h.id === playingId) ?? null;
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(HISTORY_KEY);
@@ -865,17 +870,29 @@ function Index() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {history.map((h) => (
                 <Card key={h.id} className="overflow-hidden border-border/60 bg-card/50">
-                  <div className="relative aspect-[9/16] max-h-56 w-full bg-black/60">
+                  <button
+                    type="button"
+                    onClick={() => h.editedUrl && setPlayingId(h.id)}
+                    className="group relative aspect-[9/16] max-h-56 w-full bg-black/60 text-left"
+                  >
                     <HistoryThumbnail
                       item={h}
                       onThumbnail={(thumbnailUrl) => updateHistoryThumbnail(h.id, thumbnailUrl)}
                     />
                     {h.platform && (
-                      <Badge className="absolute left-2 top-2 h-5 bg-black/60 px-2 text-[10px]">
+                      <Badge className="absolute left-2 top-2 z-10 h-5 bg-black/60 px-2 text-[10px]">
                         {h.platform}
                       </Badge>
                     )}
-                  </div>
+                    {h.editedUrl && (
+                      <span className="absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+                        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/70 backdrop-blur">
+                          <Play className="h-6 w-6 fill-white text-white" />
+                        </span>
+                      </span>
+                    )}
+                  </button>
+
                   <div className="p-3">
                     <div className="truncate text-sm font-medium" title={h.name}>
                       {h.name}
@@ -884,6 +901,16 @@ function Index() {
                       {new Date(h.processedAt).toLocaleString("pt-BR")}
                     </div>
                     <div className="mt-3 flex gap-2">
+                      {h.editedUrl ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="flex-1"
+                          onClick={() => setPlayingId(h.id)}
+                        >
+                          <Play className="mr-1.5 h-3.5 w-3.5" /> Reproduzir
+                        </Button>
+                      ) : null}
                       {h.downloadUrl ? (
                         <Button asChild size="sm" className="flex-1">
                           <a href={h.downloadUrl} download={h.name} target="_blank" rel="noopener">
@@ -903,6 +930,7 @@ function Index() {
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
+
                     </div>
                   </div>
                 </Card>
@@ -915,9 +943,40 @@ function Index() {
           Backend: {API_URL || "não configurado"}
         </footer>
       </main>
+
+      <Dialog open={!!playingItem} onOpenChange={(o) => !o && setPlayingId(null)}>
+        <DialogContent className="max-w-md border-border/60 bg-card">
+          <DialogHeader>
+            <DialogTitle className="truncate text-sm">{playingItem?.name}</DialogTitle>
+          </DialogHeader>
+          {playingItem?.editedUrl && (
+            <div className="flex aspect-[9/16] max-h-[70vh] w-full items-center justify-center overflow-hidden rounded-md bg-black">
+              <video
+                key={playingItem.id}
+                src={playingItem.editedUrl}
+                controls
+                autoPlay
+                playsInline
+                className="h-full w-full object-contain"
+              />
+            </div>
+          )}
+          {playingItem?.downloadUrl && (
+            <Button asChild size="sm" className="mt-2">
+              <a href={playingItem.downloadUrl} download={playingItem.name} target="_blank" rel="noopener">
+                <Download className="mr-1.5 h-3.5 w-3.5" /> Baixar este vídeo
+              </a>
+            </Button>
+          )}
+          <p className="mt-1 text-center text-[10px] text-muted-foreground">
+            Se o player não abrir, use "Baixar" — alguns MP4s antigos do backend não são reproduzidos direto no navegador.
+          </p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 
 function HistoryThumbnail({
