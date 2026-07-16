@@ -1143,8 +1143,6 @@ function SideBySideCompare({
 }) {
   const originalRef = useRef<HTMLVideoElement>(null);
   const editedRef = useRef<HTMLVideoElement>(null);
-  const [syncPlay, setSyncPlay] = useState(true);
-  const [muted, setMuted] = useState(true);
 
   const playBoth = () => {
     originalRef.current?.play().catch(() => {});
@@ -1160,26 +1158,6 @@ function SideBySideCompare({
     playBoth();
   };
 
-  // sync from original -> edited (basic)
-  useEffect(() => {
-    if (!syncPlay) return;
-    const o = originalRef.current;
-    const e = editedRef.current;
-    if (!o || !e) return;
-    const onPlay = () => e.play().catch(() => {});
-    const onPause = () => e.pause();
-    const onSeek = () => {
-      e.currentTime = o.currentTime;
-    };
-    o.addEventListener("play", onPlay);
-    o.addEventListener("pause", onPause);
-    o.addEventListener("seeked", onSeek);
-    return () => {
-      o.removeEventListener("play", onPlay);
-      o.removeEventListener("pause", onPause);
-      o.removeEventListener("seeked", onSeek);
-    };
-  }, [syncPlay, originalSrc, editedSrc]);
 
   const canCompare = !!originalSrc && !!editedSrc;
 
@@ -1194,23 +1172,6 @@ function SideBySideCompare({
               : "Selecione um vídeo processado para comparar."}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={syncPlay}
-              onChange={(e) => setSyncPlay(e.target.checked)}
-              className="h-3.5 w-3.5 accent-fuchsia-500"
-            />
-          </label>
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={muted}
-              onChange={(e) => setMuted(e.target.checked)}
-              className="h-3.5 w-3.5 accent-fuchsia-500"
-            />
-            {"\n"}
-          </label>
           <Button size="sm" variant="secondary" onClick={playBoth} disabled={!canCompare}>
             ▶ Play
           </Button>
@@ -1236,7 +1197,6 @@ function SideBySideCompare({
                 ref={originalRef}
                 src={originalSrc}
                 controls
-                muted={muted}
                 playsInline
                 className="h-full w-full object-contain"
               />
@@ -1270,7 +1230,6 @@ function SideBySideCompare({
                 ref={editedRef}
                 src={editedSrc}
                 controls
-                muted={muted}
                 playsInline
                 crossOrigin="anonymous"
                 className="h-full w-full object-contain"
