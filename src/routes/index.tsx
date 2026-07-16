@@ -775,10 +775,20 @@ function Index() {
                   <div className="relative aspect-[9/16] max-h-56 w-full bg-black/60">
                     {h.editedUrl ? (
                       <video
-                        src={h.editedUrl}
+                        src={`${h.editedUrl}#t=0.5`}
                         className="h-full w-full object-contain"
-                        preload="metadata"
+                        preload="auto"
                         muted
+                        playsInline
+                        crossOrigin="anonymous"
+                        onLoadedMetadata={(e) => {
+                          const v = e.currentTarget;
+                          try {
+                            if (v.currentTime === 0) v.currentTime = 0.1;
+                          } catch {
+                            /* ignore */
+                          }
+                        }}
                       />
                     ) : (
                       <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
