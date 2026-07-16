@@ -933,6 +933,7 @@ function HistoryThumbnail({
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [loadingBlob, setLoadingBlob] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
 
   useEffect(() => {
     seekTimesRef.current = [];
@@ -942,6 +943,7 @@ function HistoryThumbnail({
       return null;
     });
     setPreviewFailed(false);
+    setVideoReady(false);
   }, [item.id, item.editedUrl, item.thumbnailUrl]);
 
   useEffect(() => {
@@ -1012,6 +1014,7 @@ function HistoryThumbnail({
   };
 
   const handleFrameReady = (video: HTMLVideoElement) => {
+    setVideoReady(true);
     const frame = captureFrame(video);
     if (frame) {
       onThumbnail(frame);
@@ -1035,10 +1038,23 @@ function HistoryThumbnail({
 
   return (
     <>
+      <div
+        className={`absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[radial-gradient(circle_at_30%_20%,hsl(var(--primary)/0.45),transparent_34%),linear-gradient(135deg,hsl(var(--card)),hsl(var(--secondary)))] px-4 text-center transition-opacity ${
+          videoReady && !previewFailed ? "opacity-0" : "opacity-100"
+        }`}
+      >
+        <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-white/10 shadow-lg">
+          <Film className="h-6 w-6 text-fuchsia-200" />
+        </div>
+        <div className="max-w-[85%] truncate text-xs font-medium text-foreground">{item.name}</div>
+        <div className="text-[10px] text-muted-foreground">
+          {loadingBlob ? "Carregando prévia…" : previewFailed ? "Vídeo pronto para baixar" : "Preparando miniatura…"}
+        </div>
+      </div>
       <video
         ref={videoRef}
         src={objectUrl ? `${objectUrl}#t=2` : undefined}
-        className="h-full w-full object-contain"
+        className={`h-full w-full object-contain transition-opacity ${videoReady && !previewFailed ? "opacity-100" : "opacity-0"}`}
         preload="auto"
         autoPlay
         loop
