@@ -1197,7 +1197,6 @@ function SideBySideCompare({
                 ref={originalRef}
                 src={originalSrc}
                 controls
-                muted={muted}
                 playsInline
                 className="h-full w-full object-contain"
               />
@@ -1231,7 +1230,6 @@ function SideBySideCompare({
                 ref={editedRef}
                 src={editedSrc}
                 controls
-                muted={muted}
                 playsInline
                 crossOrigin="anonymous"
                 className="h-full w-full object-contain"
