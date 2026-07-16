@@ -1158,26 +1158,6 @@ function SideBySideCompare({
     playBoth();
   };
 
-  // sync from original -> edited (basic)
-  useEffect(() => {
-    if (!syncPlay) return;
-    const o = originalRef.current;
-    const e = editedRef.current;
-    if (!o || !e) return;
-    const onPlay = () => e.play().catch(() => {});
-    const onPause = () => e.pause();
-    const onSeek = () => {
-      e.currentTime = o.currentTime;
-    };
-    o.addEventListener("play", onPlay);
-    o.addEventListener("pause", onPause);
-    o.addEventListener("seeked", onSeek);
-    return () => {
-      o.removeEventListener("play", onPlay);
-      o.removeEventListener("pause", onPause);
-      o.removeEventListener("seeked", onSeek);
-    };
-  }, [syncPlay, originalSrc, editedSrc]);
 
   const canCompare = !!originalSrc && !!editedSrc;
 
