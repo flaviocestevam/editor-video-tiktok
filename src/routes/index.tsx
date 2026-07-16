@@ -228,7 +228,7 @@ type EditOptions = {
 };
 
 const DEFAULT_EDITS: EditOptions = {
-  remove_audio: false,
+  remove_audio: true,
   flip_horizontal: true,
   random_trim: true,
   crop_zoom: true,
