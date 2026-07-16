@@ -1172,23 +1172,6 @@ function SideBySideCompare({
               : "Selecione um vídeo processado para comparar."}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={syncPlay}
-              onChange={(e) => setSyncPlay(e.target.checked)}
-              className="h-3.5 w-3.5 accent-fuchsia-500"
-            />
-          </label>
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={muted}
-              onChange={(e) => setMuted(e.target.checked)}
-              className="h-3.5 w-3.5 accent-fuchsia-500"
-            />
-            {"\n"}
-          </label>
           <Button size="sm" variant="secondary" onClick={playBoth} disabled={!canCompare}>
             ▶ Play
           </Button>
