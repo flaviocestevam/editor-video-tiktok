@@ -930,13 +930,52 @@ function HistoryThumbnail({
   const videoRef = useRef<HTMLVideoElement>(null);
   const seekTimesRef = useRef<number[]>([]);
   const seekIndexRef = useRef(0);
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [loadingBlob, setLoadingBlob] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
 
   useEffect(() => {
     seekTimesRef.current = [];
     seekIndexRef.current = 0;
+    setObjectUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
     setPreviewFailed(false);
   }, [item.id, item.editedUrl, item.thumbnailUrl]);
+
+  useEffect(() => {
+    if (!item.editedUrl || item.thumbnailUrl) return;
+    let cancelled = false;
+    setLoadingBlob(true);
+    fetch(item.editedUrl)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        if (cancelled) return;
+        setObjectUrl((current) => {
+          if (current) URL.revokeObjectURL(current);
+          return URL.createObjectURL(blob);
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingBlob(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [item.editedUrl, item.thumbnailUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [objectUrl]);
 
   if (!item.editedUrl) {
     return (
@@ -998,7 +1037,7 @@ function HistoryThumbnail({
     <>
       <video
         ref={videoRef}
-        src={`${item.editedUrl}#t=2`}
+        src={objectUrl ? `${objectUrl}#t=2` : undefined}
         className="h-full w-full object-contain"
         preload="auto"
         autoPlay
@@ -1012,7 +1051,7 @@ function HistoryThumbnail({
         onError={() => setPreviewFailed(true)}
       />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-2 pb-2 pt-6 text-[10px] text-white/80">
-        <span>{previewFailed ? "Preview indisponível" : "Prévia do vídeo"}</span>
+        <span>{previewFailed ? "Preview indisponível" : loadingBlob ? "Carregando prévia…" : "Prévia do vídeo"}</span>
         <Play className="h-3.5 w-3.5" />
       </div>
     </>
