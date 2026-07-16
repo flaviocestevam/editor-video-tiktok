@@ -909,46 +909,6 @@ function Index() {
   );
 }
 
-function PreviewCard({
-  title,
-  src,
-  placeholder,
-  accent,
-  loading,
-}: {
-  title: string;
-  src?: string;
-  placeholder: string;
-  accent?: boolean;
-  loading?: boolean;
-}) {
-  return (
-    <Card
-      className={`overflow-hidden border-border/60 bg-card/50 ${
-        accent ? "ring-1 ring-fuchsia-500/30" : ""
-      }`}
-    >
-      <div className="flex items-center justify-between border-b border-border/60 px-4 py-2">
-        <span className="text-sm font-medium">{title}</span>
-        {accent && (
-          <Badge className="bg-fuchsia-500/20 text-fuchsia-300 hover:bg-fuchsia-500/20">novo</Badge>
-        )}
-      </div>
-      <div className="flex aspect-[9/16] max-h-[420px] w-full items-center justify-center bg-black/60">
-        {loading ? (
-          <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-6 w-6 animate-spin text-fuchsia-400" />
-            Processando…
-          </div>
-        ) : src ? (
-          <video src={src} controls className="h-full w-full object-contain" />
-        ) : (
-          <span className="px-4 text-center text-sm text-muted-foreground">{placeholder}</span>
-        )}
-      </div>
-    </Card>
-  );
-}
 
 function SideBySideCompare({
   originalSrc,
