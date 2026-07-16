@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
+
 import { toast, Toaster } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -187,14 +187,30 @@ async function fetchWithTimeout(
   }
 }
 
-async function callProcess(
-  fileId: string,
-  opts: { muteAudio: boolean; addIntroOutro: boolean },
-): Promise<unknown> {
+type EditOptions = {
+  remove_audio: boolean;
+  flip_horizontal: boolean;
+  random_trim: boolean;
+  crop_zoom: boolean;
+  speed_change: boolean;
+  color_adjust: boolean;
+  fade: boolean;
+};
+
+const DEFAULT_EDITS: EditOptions = {
+  remove_audio: false,
+  flip_horizontal: true,
+  random_trim: true,
+  crop_zoom: true,
+  speed_change: true,
+  color_adjust: true,
+  fade: true,
+};
+
+async function callProcess(fileId: string, opts: EditOptions): Promise<unknown> {
   const body = new URLSearchParams();
   body.set("file_id", fileId);
-  body.set("remove_audio", String(opts.muteAudio));
-  body.set("fade", String(opts.addIntroOutro));
+  (Object.keys(opts) as (keyof EditOptions)[]).forEach((k) => body.set(k, String(opts[k])));
   const res = await fetchWithTimeout(
     `${API_URL}/api/video/process`,
     {
@@ -212,8 +228,8 @@ function Index() {
   const [link, setLink] = useState("");
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [muteAudio, setMuteAudio] = useState(false);
-  const [addIntroOutro, setAddIntroOutro] = useState(true);
+  const [edits, setEdits] = useState<EditOptions>(DEFAULT_EDITS);
+  const setEdit = (k: keyof EditOptions, v: boolean) => setEdits((e) => ({ ...e, [k]: v }));
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const detectedPlatform = useMemo(
@@ -325,7 +341,7 @@ function Index() {
       if (!fileId) throw new Error("Upload sem file_id na resposta");
 
       // Step 2: process
-      const data = await callProcess(fileId, { muteAudio, addIntroOutro });
+      const data = await callProcess(fileId, edits);
       const { editedUrl, downloadUrl } = extractProcessedUrl(data);
       if (!editedUrl) throw new Error("Backend não retornou URL do vídeo processado");
       const done = { ...item, status: "done" as const, editedUrl, downloadUrl };
@@ -363,7 +379,7 @@ function Index() {
       if (!fileId) throw new Error("Download sem file_id na resposta");
 
       // Step 2: process
-      const data = await callProcess(fileId, { muteAudio, addIntroOutro });
+      const data = await callProcess(fileId, edits);
       const { editedUrl, downloadUrl } = extractProcessedUrl(data);
       if (!editedUrl) throw new Error("Backend não retornou URL do vídeo processado");
       const done = { ...item, status: "done" as const, editedUrl, downloadUrl };
@@ -614,41 +630,75 @@ function Index() {
             2. Edições automáticas aplicadas
           </h2>
           <Card className="border-border/60 bg-card/50 p-5">
+            <p className="mb-3 text-xs text-muted-foreground">
+              Ative/desative cada edição. Todas ativas por padrão para máxima diferença em relação
+              ao original.
+            </p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {[
-                { icon: FlipHorizontal2, label: "Flip horizontal" },
-                { icon: Scissors, label: "Cortes leves (início/fim)" },
-                { icon: Sparkles, label: "Crop/zoom suave" },
-                { icon: Gauge, label: "Velocidade 0.92x – 1.08x" },
-                { icon: Palette, label: "Cor, brilho, contraste, saturação" },
-                { icon: Film, label: "Re-encode máxima compatibilidade" },
-              ].map((f) => (
+              {([
+                { key: "flip_horizontal", icon: FlipHorizontal2, label: "Flip horizontal", hint: "Espelha o vídeo" },
+                { key: "random_trim", icon: Scissors, label: "Cortes início/fim", hint: "Remove segundos das pontas" },
+                { key: "crop_zoom", icon: Sparkles, label: "Crop / zoom suave", hint: "Reenquadra ~5-10%" },
+                { key: "speed_change", icon: Gauge, label: "Velocidade 0.92x–1.08x", hint: "Altera ritmo do vídeo" },
+                { key: "color_adjust", icon: Palette, label: "Cor, brilho, contraste", hint: "Ajustes de saturação" },
+                { key: "fade", icon: Film, label: "Fade intro/outro", hint: "Fade in/out nas bordas" },
+                { key: "remove_audio", icon: Music2, label: "Remover áudio", hint: "Silencia trilha original" },
+              ] as { key: keyof EditOptions; icon: typeof Sparkles; label: string; hint: string }[]).map((f) => (
                 <div
-                  key={f.label}
-                  className="flex items-center gap-2 rounded-md border border-border/50 bg-background/40 px-3 py-2 text-sm"
+                  key={f.key}
+                  className={`flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                    edits[f.key]
+                      ? "border-fuchsia-500/40 bg-fuchsia-500/5"
+                      : "border-border/50 bg-background/40 opacity-70"
+                  }`}
                 >
-                  <f.icon className="h-4 w-4 text-fuchsia-400" />
-                  {f.label}
+                  <Label htmlFor={`edit-${f.key}`} className="flex flex-1 items-center gap-2 cursor-pointer">
+                    <f.icon className={`h-4 w-4 ${edits[f.key] ? "text-fuchsia-400" : "text-muted-foreground"}`} />
+                    <span className="flex flex-col">
+                      <span className="leading-tight">{f.label}</span>
+                      <span className="text-[10px] text-muted-foreground">{f.hint}</span>
+                    </span>
+                  </Label>
+                  <Switch
+                    id={`edit-${f.key}`}
+                    checked={edits[f.key]}
+                    onCheckedChange={(v) => setEdit(f.key, v)}
+                  />
                 </div>
               ))}
             </div>
-
-            <Separator className="my-5" />
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex items-center justify-between rounded-md border border-border/50 bg-background/40 px-3 py-2">
-                <Label htmlFor="intro" className="flex items-center gap-2 text-sm">
-                  <Sparkles className="h-4 w-4 text-indigo-400" /> Intro & outro (fade)
-                </Label>
-                <Switch id="intro" checked={addIntroOutro} onCheckedChange={setAddIntroOutro} />
-              </div>
-              <div className="flex items-center justify-between rounded-md border border-border/50 bg-background/40 px-3 py-2">
-                <Label htmlFor="mute" className="flex items-center gap-2 text-sm">
-                  <Music2 className="h-4 w-4 text-indigo-400" /> Remover áudio
-                </Label>
-                <Switch id="mute" checked={muteAudio} onCheckedChange={setMuteAudio} />
+            <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                {Object.values(edits).filter(Boolean).length} de 7 edições ativas
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEdits(DEFAULT_EDITS)}
+                  className="text-fuchsia-400 hover:underline"
+                >
+                  Padrão
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEdits({
+                      remove_audio: false,
+                      flip_horizontal: true,
+                      random_trim: true,
+                      crop_zoom: true,
+                      speed_change: true,
+                      color_adjust: true,
+                      fade: true,
+                    })
+                  }
+                  className="text-indigo-400 hover:underline"
+                >
+                  Ativar todas
+                </button>
               </div>
             </div>
+
 
             {videos.length > 0 && (
               <div className="mt-6">
