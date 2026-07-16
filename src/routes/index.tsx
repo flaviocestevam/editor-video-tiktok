@@ -63,6 +63,7 @@ type HistoryItem = {
   source: "link" | "upload";
   editedUrl?: string;
   downloadUrl?: string;
+  thumbnailUrl?: string;
   processedAt: number;
 };
 
@@ -88,13 +89,39 @@ function absoluteUrl(pathOrUrl: string): string {
   return `${API_URL}${cleanUrl.startsWith("/") ? "" : "/"}${cleanUrl}`;
 }
 
-function timedVideoUrl(url: string, seconds = 1.25): string {
-  return `${absoluteUrl(url)}#t=${seconds}`;
+function thumbnailTimes(video: HTMLVideoElement): number[] {
+  const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 6;
+  return [0.42, 0.58, 0.28, 0.72, 0.86].map((ratio) =>
+    Math.min(Math.max(duration * ratio, 0.75), Math.max(duration - 0.35, 0.75)),
+  );
 }
 
-function thumbnailSecond(video: HTMLVideoElement): number {
-  if (!Number.isFinite(video.duration) || video.duration <= 0) return 1.25;
-  return Math.min(Math.max(video.duration * 0.35, 1.25), 3);
+function captureFrame(video: HTMLVideoElement): string | null | undefined {
+  if (!video.videoWidth || !video.videoHeight) return null;
+  const canvas = document.createElement("canvas");
+  const maxWidth = 360;
+  const scale = Math.min(1, maxWidth / video.videoWidth);
+  canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+  canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+
+  try {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let brightness = 0;
+    let samples = 0;
+    const step = Math.max(4, Math.floor(pixels.length / 900));
+    for (let i = 0; i < pixels.length; i += step * 4) {
+      brightness += pixels[i] * 0.2126 + pixels[i + 1] * 0.7152 + pixels[i + 2] * 0.0722;
+      samples += 1;
+    }
+    const averageBrightness = samples ? brightness / samples : 0;
+    if (averageBrightness < 18) return null;
+    return canvas.toDataURL("image/jpeg", 0.78);
+  } catch {
+    return undefined;
+  }
 }
 
 function normalizeHistoryItem(item: HistoryItem): HistoryItem {
@@ -102,6 +129,7 @@ function normalizeHistoryItem(item: HistoryItem): HistoryItem {
     ...item,
     editedUrl: item.editedUrl ? absoluteUrl(item.editedUrl) : undefined,
     downloadUrl: item.downloadUrl ? absoluteUrl(item.downloadUrl) : undefined,
+    thumbnailUrl: item.thumbnailUrl,
   };
 }
 
