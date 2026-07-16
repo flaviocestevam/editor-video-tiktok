@@ -348,6 +348,13 @@ function Index() {
 
   const removeFromHistory = (id: string) => saveHistory(history.filter((h) => h.id !== id));
   const clearHistory = () => saveHistory([]);
+  const updateHistoryThumbnail = (id: string, thumbnailUrl: string) => {
+    setHistory((prev) => {
+      const next = prev.map((h) => (h.id === id ? { ...h, thumbnailUrl } : h));
+      persistHistory(next);
+      return next;
+    });
+  };
 
   const updateVideo = (id: string, patch: Partial<VideoItem>) =>
     setVideos((vs) => vs.map((v) => (v.id === id ? { ...v, ...patch } : v)));
@@ -859,35 +866,10 @@ function Index() {
               {history.map((h) => (
                 <Card key={h.id} className="overflow-hidden border-border/60 bg-card/50">
                   <div className="relative aspect-[9/16] max-h-56 w-full bg-black/60">
-                    {h.editedUrl ? (
-                      <video
-                        src={timedVideoUrl(h.editedUrl)}
-                        className="h-full w-full object-contain"
-                        preload="auto"
-                        muted
-                        playsInline
-                        onLoadedMetadata={(e) => {
-                          const v = e.currentTarget;
-                          try {
-                            v.currentTime = thumbnailSecond(v);
-                          } catch {
-                            /* ignore */
-                          }
-                        }}
-                        onCanPlay={(e) => {
-                          const v = e.currentTarget;
-                          try {
-                            void v.play().then(() => v.pause()).catch(() => undefined);
-                          } catch {
-                            /* ignore */
-                          }
-                        }}
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                        Sem preview
-                      </div>
-                    )}
+                    <HistoryThumbnail
+                      item={h}
+                      onThumbnail={(thumbnailUrl) => updateHistoryThumbnail(h.id, thumbnailUrl)}
+                    />
                     {h.platform && (
                       <Badge className="absolute left-2 top-2 h-5 bg-black/60 px-2 text-[10px]">
                         {h.platform}
