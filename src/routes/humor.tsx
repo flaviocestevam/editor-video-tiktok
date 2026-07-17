@@ -5,7 +5,7 @@ import { toast, Toaster } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { API_URL, createHumorPlan, downloadVideo, renderHumorVideo, uploadVideo } from "@/features/humor/api";
+import { API_URL, absoluteUrl, createHumorPlan, downloadVideo, renderHumorVideo, uploadVideo } from "@/features/humor/api";
 import { HumorImporter } from "@/features/humor/HumorImporter";
 import { HumorMomentCard } from "@/features/humor/HumorMomentCard";
 import { HumorPreview } from "@/features/humor/HumorPreview";
@@ -27,6 +27,7 @@ function HumorTutorial() {
   const [stage, setStage] = useState<Stage>("idle");
   const [link, setLink] = useState("");
   const [fileId, setFileId] = useState<string | null>(null);
+  const [montageFilename, setMontageFilename] = useState<string | null>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState("tutorial-engracado.mp4");
   const [plan, setPlan] = useState<HumorPlan | null>(null);
@@ -46,18 +47,25 @@ function HumorTutorial() {
     const data = await createHumorPlan(nextFileId);
     setPlan(data);
     setMoments(data.moments);
+    setMontageFilename(data.preview_filename);
+    setSourceUrl(absoluteUrl(data.preview_url));
     setStage("ready");
-    toast.success("Momentos detectados. Escolha e edite as frases.");
+    toast.success("Montagem pronta. Escolha e edite as frases sobre a prévia final.");
+  };
+
+  const resetPlan = () => {
+    setRenderedUrl(null);
+    setPlan(null);
+    setMoments([]);
+    setMontageFilename(null);
+    setSourceUrl(null);
   };
 
   const handleFile = async (file: File) => {
     if (!API_URL) return toast.error("VITE_API_URL não está configurada.");
-    setRenderedUrl(null);
-    setPlan(null);
-    setMoments([]);
+    resetPlan();
     setStage("uploading");
     setFileName(file.name.replace(/\.mp4$/i, "") + "-tutorial.mp4");
-    setSourceUrl(URL.createObjectURL(file));
     try {
       const nextFileId = await uploadVideo(file);
       setFileId(nextFileId);
@@ -72,14 +80,11 @@ function HumorTutorial() {
     const url = link.trim();
     if (!url) return toast.error("Cole um link primeiro.");
     if (!API_URL) return toast.error("VITE_API_URL não está configurada.");
-    setRenderedUrl(null);
-    setPlan(null);
-    setMoments([]);
+    resetPlan();
     setStage("uploading");
     try {
       const nextFileId = await downloadVideo(url);
       setFileId(nextFileId);
-      setSourceUrl(`${API_URL}/api/humor/source/${nextFileId}`);
       setFileName("tutorial-engracado.mp4");
       setLink("");
       await loadPlan(nextFileId);
@@ -96,10 +101,10 @@ function HumorTutorial() {
   };
 
   const handleRender = async () => {
-    if (!fileId) return toast.error("Envie um vídeo primeiro.");
+    if (!fileId || !montageFilename) return toast.error("A montagem de prévia ainda não está pronta.");
     setStage("rendering");
     try {
-      const url = await renderHumorVideo(fileId, moments);
+      const url = await renderHumorVideo(fileId, montageFilename, moments);
       setRenderedUrl(url);
       setStage("done");
       toast.success("Tutorial renderizado com as frases aprovadas.");
@@ -136,7 +141,7 @@ function HumorTutorial() {
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-semibold">2. Aprove as frases e os momentos</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Quatro frases ficam ativas por padrão para manter o ritmo e evitar humor forçado.</p>
+                <p className="mt-1 text-sm text-muted-foreground">A prévia já contém cortes, câmera lenta, zoom out, freeze e replay. Quatro frases ficam ativas por padrão.</p>
               </div>
               {moments.map((moment, index) => (
                 <HumorMomentCard
