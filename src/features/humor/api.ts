@@ -59,7 +59,11 @@ export async function createHumorPlan(fileId: string): Promise<HumorPlan> {
   return (await response.json()) as HumorPlan;
 }
 
-export async function renderHumorVideo(fileId: string, moments: HumorMoment[]): Promise<string> {
+export async function renderHumorVideo(
+  fileId: string,
+  montageFilename: string,
+  moments: HumorMoment[],
+): Promise<string> {
   const script = moments
     .filter((moment) => moment.enabled && moment.selected_text.trim())
     .map((moment) => ({
@@ -74,6 +78,7 @@ export async function renderHumorVideo(fileId: string, moments: HumorMoment[]): 
 
   const form = new FormData();
   form.set("file_id", fileId);
+  form.set("montage_filename", montageFilename);
   form.set("script_json", JSON.stringify(script));
   form.set("quality_crf", "18");
   const response = await fetch(`${API_URL}/api/humor/render`, {
