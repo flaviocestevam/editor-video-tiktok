@@ -1,7 +1,11 @@
 import type { HumorMoment, HumorPlan } from "./types";
 
-export const API_URL =
-  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+const DEFAULT_API_URL =
+  "https://editor-video-tiktok-backend-production.up.railway.app";
+
+export const API_URL = (
+  (import.meta.env.VITE_API_URL as string | undefined) ?? DEFAULT_API_URL
+).replace(/\/$/, "");
 
 export function absoluteUrl(pathOrUrl: string): string {
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
@@ -47,10 +51,71 @@ export async function downloadVideo(url: string): Promise<string> {
   return data.file_id as string;
 }
 
-export async function createHumorPlan(fileId: string): Promise<HumorPlan> {
+export type ProcessedVideo = {
+  output_filename: string;
+  download_url: string;
+};
+
+export async function processVideoWithAllEdits(
+  fileId: string,
+): Promise<ProcessedVideo> {
   const form = new FormData();
   form.set("file_id", fileId);
-  const response = await fetch(`${API_URL}/api/humor/plan`, {
+
+  const enabledBooleans = [
+    "remove_audio",
+    "flip_horizontal",
+    "random_trim",
+    "crop_zoom",
+    "speed_change",
+    "color_adjust",
+    "fade",
+    "strip_metadata",
+    "smooth_motion",
+    "adaptive_sharpen",
+    "dynamic_montage_enabled",
+    "hard_cuts",
+    "speed_ramp",
+    "short_slowmo",
+    "short_speedup",
+    "freeze_frame",
+    "highlight_replay",
+  ];
+  enabledBooleans.forEach((key) => form.set(key, "true"));
+
+  form.set("sensor_noise", "2");
+  form.set("crop_pixels", "4");
+  form.set("zoom_factor", "1.02");
+  form.set("hue_degrees", "1");
+  form.set("color_grade", "cinematic");
+  form.set("output_fps", "29.97");
+  form.set("quality_crf", "18");
+
+  const response = await fetch(`${API_URL}/api/video/process`, {
+    method: "POST",
+    body: form,
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(await readError(response));
+
+  const data = await response.json();
+  if (!data.output_filename) {
+    throw new Error("O editor não retornou o vídeo processado.");
+  }
+  return {
+    output_filename: data.output_filename as string,
+    download_url: absoluteUrl(
+      data.download_url || `/api/video/result/${data.output_filename}`,
+    ),
+  };
+}
+
+export async function createHumorPlan(
+  montageFilename: string,
+): Promise<HumorPlan> {
+  const form = new FormData();
+  form.set("montage_filename", montageFilename);
+  const response = await fetch(`${API_URL}/api/humor/caption-plan`, {
     method: "POST",
     body: form,
     headers: { Accept: "application/json" },
@@ -60,7 +125,6 @@ export async function createHumorPlan(fileId: string): Promise<HumorPlan> {
 }
 
 export async function renderHumorVideo(
-  fileId: string,
   montageFilename: string,
   moments: HumorMoment[],
 ): Promise<string> {
@@ -77,16 +141,17 @@ export async function renderHumorVideo(
   if (!script.length) throw new Error("Ative pelo menos uma frase.");
 
   const form = new FormData();
-  form.set("file_id", fileId);
   form.set("montage_filename", montageFilename);
   form.set("script_json", JSON.stringify(script));
   form.set("quality_crf", "18");
-  const response = await fetch(`${API_URL}/api/humor/render`, {
+  const response = await fetch(`${API_URL}/api/humor/caption-render`, {
     method: "POST",
     body: form,
     headers: { Accept: "application/json" },
   });
   if (!response.ok) throw new Error(await readError(response));
   const data = await response.json();
-  return absoluteUrl(data.download_url || `/api/video/result/${data.output_filename}`);
+  return absoluteUrl(
+    data.download_url || `/api/video/result/${data.output_filename}`,
+  );
 }

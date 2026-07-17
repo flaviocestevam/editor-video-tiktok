@@ -1,22 +1,44 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { ArrowLeft, Check, Film, Loader2, MessageSquareText } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Film,
+  Loader2,
+  MessageSquareText,
+} from "lucide-react";
 import { toast, Toaster } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { API_URL, absoluteUrl, createHumorPlan, downloadVideo, renderHumorVideo, uploadVideo } from "@/features/humor/api";
+import {
+  API_URL,
+  absoluteUrl,
+  createHumorPlan,
+  downloadVideo,
+  processVideoWithAllEdits,
+  renderHumorVideo,
+  uploadVideo,
+} from "@/features/humor/api";
 import { HumorImporter } from "@/features/humor/HumorImporter";
 import { HumorMomentCard } from "@/features/humor/HumorMomentCard";
 import { HumorPreview } from "@/features/humor/HumorPreview";
 import { HumorResult } from "@/features/humor/HumorResult";
-import type { HumorMoment, HumorPlan, Stage } from "@/features/humor/types";
+import type {
+  HumorMoment,
+  HumorPlan,
+  Stage,
+} from "@/features/humor/types";
 
 export const Route = createFileRoute("/humor")({
   head: () => ({
     meta: [
       { title: "Tutorial Engraçado — Editor Vídeos TikTok" },
-      { name: "description", content: "Crie tutoriais esportivos com sarcasmo e aprovação manual das frases." },
+      {
+        name: "description",
+        content:
+          "Edite o vídeo com as 19 funções e depois aprove manualmente as frases.",
+      },
     ],
   }),
   component: HumorTutorial,
@@ -29,28 +51,44 @@ function HumorTutorial() {
   const [fileId, setFileId] = useState<string | null>(null);
   const [montageFilename, setMontageFilename] = useState<string | null>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
-  const [fileName, setFileName] = useState("tutorial-engracado.mp4");
+  const [fileName, setFileName] = useState("video-editado-com-legendas.mp4");
   const [plan, setPlan] = useState<HumorPlan | null>(null);
   const [moments, setMoments] = useState<HumorMoment[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
 
-  const activeCount = moments.filter((moment) => moment.enabled && moment.selected_text.trim()).length;
-  const busy = stage === "uploading" || stage === "planning" || stage === "rendering";
+  const activeCount = moments.filter(
+    (moment) => moment.enabled && moment.selected_text.trim(),
+  ).length;
+  const busy =
+    stage === "uploading" || stage === "planning" || stage === "rendering";
 
   const updateMoment = (id: string, patch: Partial<HumorMoment>) => {
-    setMoments((items) => items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+    setMoments((items) =>
+      items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    );
   };
 
   const loadPlan = async (nextFileId: string) => {
     setStage("planning");
-    const data = await createHumorPlan(nextFileId);
+
+    // Mantém o editor original: primeiro aplica as 19 funções em /api/video/process.
+    const processed = await processVideoWithAllEdits(nextFileId);
+
+    // Depois analisa exatamente esse MP4, sem recriar ou trocar a montagem.
+    const data = await createHumorPlan(processed.output_filename);
+    if (data.preview_filename !== processed.output_filename) {
+      throw new Error("O backend tentou substituir o vídeo já editado.");
+    }
+
     setPlan(data);
     setMoments(data.moments);
-    setMontageFilename(data.preview_filename);
-    setSourceUrl(absoluteUrl(data.preview_url));
+    setMontageFilename(processed.output_filename);
+    setSourceUrl(absoluteUrl(data.preview_url || processed.download_url));
     setStage("ready");
-    toast.success("Montagem pronta. Escolha e edite as frases sobre a prévia final.");
+    toast.success(
+      "As 19 edições foram concluídas. Agora escolha e edite as frases.",
+    );
   };
 
   const resetPlan = () => {
@@ -62,35 +100,41 @@ function HumorTutorial() {
   };
 
   const handleFile = async (file: File) => {
-    if (!API_URL) return toast.error("VITE_API_URL não está configurada.");
+    if (!API_URL) return toast.error("O backend Railway não está configurado.");
     resetPlan();
     setStage("uploading");
-    setFileName(file.name.replace(/\.mp4$/i, "") + "-tutorial.mp4");
+    setFileName(
+      file.name.replace(/\.mp4$/i, "") + "-editado-com-legendas.mp4",
+    );
     try {
       const nextFileId = await uploadVideo(file);
       setFileId(nextFileId);
       await loadPlan(nextFileId);
     } catch (error) {
       setStage("idle");
-      toast.error(error instanceof Error ? error.message : "Falha ao analisar o vídeo.");
+      toast.error(
+        error instanceof Error ? error.message : "Falha ao editar o vídeo.",
+      );
     }
   };
 
   const handleLink = async () => {
     const url = link.trim();
     if (!url) return toast.error("Cole um link primeiro.");
-    if (!API_URL) return toast.error("VITE_API_URL não está configurada.");
+    if (!API_URL) return toast.error("O backend Railway não está configurado.");
     resetPlan();
     setStage("uploading");
     try {
       const nextFileId = await downloadVideo(url);
       setFileId(nextFileId);
-      setFileName("tutorial-engracado.mp4");
+      setFileName("video-editado-com-legendas.mp4");
       setLink("");
       await loadPlan(nextFileId);
     } catch (error) {
       setStage("idle");
-      toast.error(error instanceof Error ? error.message : "Falha ao importar o vídeo.");
+      toast.error(
+        error instanceof Error ? error.message : "Falha ao importar o vídeo.",
+      );
     }
   };
 
@@ -101,16 +145,20 @@ function HumorTutorial() {
   };
 
   const handleRender = async () => {
-    if (!fileId || !montageFilename) return toast.error("A montagem de prévia ainda não está pronta.");
+    if (!montageFilename) {
+      return toast.error("O vídeo editado ainda não está pronto.");
+    }
     setStage("rendering");
     try {
-      const url = await renderHumorVideo(fileId, montageFilename, moments);
+      const url = await renderHumorVideo(montageFilename, moments);
       setRenderedUrl(url);
       setStage("done");
-      toast.success("Tutorial renderizado com as frases aprovadas.");
+      toast.success("As frases foram aplicadas no mesmo vídeo já editado.");
     } catch (error) {
       setStage("ready");
-      toast.error(error instanceof Error ? error.message : "Falha ao renderizar.");
+      toast.error(
+        error instanceof Error ? error.message : "Falha ao aplicar as frases.",
+      );
     }
   };
 
@@ -124,24 +172,49 @@ function HumorTutorial() {
               <MessageSquareText className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold tracking-tight">Tutorial Engraçado</h1>
-              <p className="text-xs text-muted-foreground">Sarcasmo, esporte, relacionamento e poder feminino</p>
+              <h1 className="text-lg font-semibold tracking-tight">
+                Editor completo + frases
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                19 edições primeiro; legendas depois, no mesmo MP4
+              </p>
             </div>
           </div>
-          <Button asChild variant="ghost" size="sm"><Link to="/"><ArrowLeft className="mr-2 h-4 w-4" /> Editor principal</Link></Button>
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Editor principal
+            </Link>
+          </Button>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl space-y-7 px-4 py-7">
-        <HumorImporter stage={stage} link={link} onLink={setLink} onImport={handleLink} onFile={handleFile} />
+        <HumorImporter
+          stage={stage}
+          link={link}
+          onLink={setLink}
+          onImport={handleLink}
+          onFile={handleFile}
+        />
 
         {plan && sourceUrl && (
           <div className="grid gap-6 lg:grid-cols-[minmax(300px,420px)_1fr]">
-            <HumorPreview sourceUrl={sourceUrl} currentTime={currentTime} moments={moments} videoRef={videoRef} onTime={setCurrentTime} />
+            <HumorPreview
+              sourceUrl={sourceUrl}
+              currentTime={currentTime}
+              moments={moments}
+              videoRef={videoRef}
+              onTime={setCurrentTime}
+            />
             <div className="space-y-4">
               <div>
-                <h2 className="text-lg font-semibold">2. Aprove as frases e os momentos</h2>
-                <p className="mt-1 text-sm text-muted-foreground">A prévia já contém cortes, câmera lenta, zoom out, freeze e replay. Quatro frases ficam ativas por padrão.</p>
+                <h2 className="text-lg font-semibold">
+                  2. Aprove as frases e os momentos
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  A prévia é o vídeo que já passou pelas 19 opções. Esta etapa
+                  adiciona somente os textos escolhidos.
+                </p>
               </div>
               {moments.map((moment, index) => (
                 <HumorMomentCard
@@ -156,11 +229,31 @@ function HumorTutorial() {
               <Card className="border-emerald-500/25 bg-emerald-500/5 p-5">
                 <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                   <div>
-                    <div className="flex items-center gap-2 font-semibold"><Check className="h-4 w-4 text-emerald-400" /> {activeCount} frases aprovadas</div>
-                    <p className="mt-1 text-sm text-muted-foreground">O vídeo só será renderizado com as frases ativadas acima.</p>
+                    <div className="flex items-center gap-2 font-semibold">
+                      <Check className="h-4 w-4 text-emerald-400" />
+                      {activeCount} frases aprovadas
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Nenhuma edição anterior será refeita ou removida.
+                    </p>
                   </div>
-                  <Button onClick={handleRender} disabled={busy || activeCount === 0} size="lg" className="min-w-52 bg-gradient-to-r from-fuchsia-500 to-orange-400">
-                    {stage === "rendering" ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Renderizando…</> : <><Film className="mr-2 h-4 w-4" />Aprovar e renderizar</>}
+                  <Button
+                    onClick={handleRender}
+                    disabled={busy || activeCount === 0}
+                    size="lg"
+                    className="min-w-52 bg-gradient-to-r from-fuchsia-500 to-orange-400"
+                  >
+                    {stage === "rendering" ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Aplicando textos…
+                      </>
+                    ) : (
+                      <>
+                        <Film className="mr-2 h-4 w-4" />
+                        Finalizar vídeo completo
+                      </>
+                    )}
                   </Button>
                 </div>
               </Card>
