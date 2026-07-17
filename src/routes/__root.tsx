@@ -143,7 +143,14 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+      <nav className="fixed bottom-4 right-4 z-[70] flex rounded-xl border border-border/70 bg-card/90 p-1 shadow-2xl backdrop-blur">
+        <Link to="/" className="rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-background hover:text-foreground">
+          Editor
+        </Link>
+        <Link to="/humor" className="rounded-lg bg-gradient-to-r from-fuchsia-500 to-orange-400 px-3 py-2 text-xs font-semibold text-white shadow">
+          Tutorial engraçado
+        </Link>
+      </nav>
       <Outlet />
     </QueryClientProvider>
   );
