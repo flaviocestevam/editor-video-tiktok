@@ -15,6 +15,27 @@ function formatTime(value: number): string {
   return `${String(minutes).padStart(2, "0")}:${seconds.toFixed(2).padStart(5, "0")}`;
 }
 
+function wrapCaption(text: string): string {
+  const clean = text.trim().replace(/\s+/g, " ");
+  const maxChars = 24;
+  if (clean.length <= maxChars) return clean;
+  const words = clean.split(" ");
+  let best: { score: number; first: string; second: string } | null = null;
+  for (let index = 1; index < words.length; index += 1) {
+    const first = words.slice(0, index).join(" ");
+    const second = words.slice(index).join(" ");
+    if (first.length <= maxChars + 5 && second.length <= maxChars + 5) {
+      const score = Math.abs(first.length - second.length);
+      if (!best || score < best.score) best = { score, first, second };
+    }
+  }
+  if (best) return `${best.first}\n${best.second}`;
+  const first = clean.slice(0, maxChars).trimEnd();
+  const remaining = clean.slice(first.length).trim();
+  const second = remaining.length > maxChars + 5 ? `${remaining.slice(0, maxChars + 2).trimEnd()}…` : remaining;
+  return `${first}\n${second}`;
+}
+
 export function HumorPreview({
   sourceUrl,
   currentTime,
@@ -50,19 +71,19 @@ export function HumorPreview({
           />
           {active && (
             <div
-              className="pointer-events-none absolute left-1/2 z-20 w-[84%] -translate-x-1/2 rounded-xl bg-black/20 px-4 py-3 text-center text-white"
+              className="pointer-events-none absolute left-1/2 z-20 w-[84%] -translate-x-1/2 whitespace-pre-line rounded-xl bg-black/15 px-4 py-3 text-center text-white"
               style={{
                 ...positionStyle(active.position),
                 fontFamily: 'Lato, Inter, "Arial Black", sans-serif',
                 fontWeight: 900,
-                fontSize: "clamp(24px, 4.5vw, 52px)",
-                lineHeight: 0.98,
-                letterSpacing: "-0.035em",
+                fontSize: "clamp(22px, 4vw, 46px)",
+                lineHeight: 1,
+                letterSpacing: "-0.03em",
                 textShadow:
                   "-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000,3px 3px 0 #000,0 5px 8px rgba(0,0,0,.85)",
               }}
             >
-              {active.selected_text}
+              {wrapCaption(active.selected_text)}
             </div>
           )}
         </div>
