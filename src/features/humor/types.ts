@@ -16,6 +16,8 @@ export type HumorPlan = {
   width: number;
   height: number;
   motion_peak: number;
+  preview_filename: string;
+  preview_url: string;
   style: {
     font: string;
     max_lines: number;
