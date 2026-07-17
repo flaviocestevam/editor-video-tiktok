@@ -1,5 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
+import "./lib/enable-dynamic-visual-effects";
 import { routeTree } from "./routeTree.gen";
 
 export const getRouter = () => {
